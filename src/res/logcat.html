@@ -84,13 +84,13 @@
     <div class="a">
         <div class="b">
             <div class="toolbar">
-                <input id="q" placeholder="Filter regex (e.g. word|error)" title="Filter regex"/>
-                <button id="pausebtn" class="act" title="Pause / resume">⏸</button>
-                <button id="scrollbtn" class="act on" title="Auto-scroll to newest">⇣</button>
-                <button id="clearlcbtn" class="act" disabled="true" title="Clear logcat">🗑</button>
+                <input id="q" placeholder="!{lFilterPlaceholder}" title="!{lFilterTitle}"/>
+                <button id="pausebtn" class="act" title="!{lPause}">⏸</button>
+                <button id="scrollbtn" class="act on" title="!{lAutoScroll}">⇣</button>
+                <button id="clearlcbtn" class="act" disabled="true" title="!{lClear}">🗑</button>
             </div>
             <div class="toolbar" style="margin-top:.35em;">
-                <span style="opacity:.7;font-size:.9em;">Level:</span>
+                <span style="opacity:.7;font-size:.9em;">!{lLevel}</span>
                 <button class="lvl on" data-lvl="V">V</button>
                 <button class="lvl on" data-lvl="D">D</button>
                 <button class="lvl on" data-lvl="I">I</button>
@@ -290,7 +290,7 @@
                         for (let i = 0; i < all.length; i++) {
                             if (!all[i].classList.contains('filter')) visible++;
                         }
-                        getId('lcount').textContent = `shown ${visible} / ${logcount}`;
+                        getId('lcount').textContent = '!{lShown}'.replace('{0}', visible).replace('{1}', logcount);
                     };
 
                     showFilterErr = (msg) => {
@@ -304,7 +304,7 @@
                             try {
                                 newfilter = new RegExp(new_filter_source, 'i');
                                 newfilter.matchCounts = {true:0,false:0};
-                            } catch(err) { return showFilterErr('Invalid regular expression'); }
+                            } catch(err) { return showFilterErr('!{lInvalidRegex}'); }
                         }
                         const logs = rows.getElementsByClassName('log');
                         for (let i = 0; i < logs.length; i++) applyAllFilters(logs[i]);
@@ -344,7 +344,7 @@
 
                     var connect = () => {
                         try {
-                            setStatus('Connecting...');
+                            setStatus('!{lConnecting}');
                             var x = new WebSocket('ws://127.0.0.1:!{wssport}/!{logcatid}');
                             x.onopen = e => {
                                 setStatus('');
@@ -355,7 +355,7 @@
                                 ws = null;
                                 getId('clearlcbtn').disabled = true;
                             };
-                            x.onerror = e => { setStatus('Connection error'); };
+                            x.onerror = e => { setStatus('!{lConnectionError}'); };
                             x.onmessage = e => {
                                 if (!rows) return;
                                 var rawlogs = e.data.trim();

@@ -7,9 +7,15 @@ const WebSocketServer = require('ws').Server;
 // our stuff
 const { ADBClient } = require('./adbclient');
 const { AndroidContentProvider } = require('./contentprovider');
-const { checkADBStarted } = require('./utils/android');
-const { selectTargetDevice } = require('./utils/device');
 const { D } = require('./utils/print');
+
+// Lazy i18n - logcat.js is also loaded by the debug adapter process where the
+// 'vscode' module is unavailable, so the require must be guarded.
+let _i18n = null;
+try { _i18n = require('./i18n'); } catch (e) { /* not inside the extension host */ }
+function loc(key, def, ...args) {
+    return (_i18n && typeof _i18n.localize === 'function') ? _i18n.localize(key, def, ...args) : def;
+}
 
 /**
  * WebSocketServer instance
@@ -83,7 +89,7 @@ class LogcatContent {
             this._state = 'connected';
             this._initwait = null;
         } catch (err) {
-            return `Logcat initialisation failed. ${err.message}`;
+            return loc('logcat.initFailedContent', 'Logcat initialisation failed: {0}', err.message);
         }
         // retrieve the initial content
         return this.content();
@@ -123,7 +129,7 @@ class LogcatContent {
             this._initwait = null;
             const cached_content = this.htmlBootstrap({
                 connected: false,
-                status: 'Device disconnected',
+                status: loc('logcat.disconnected', 'Device disconnected'),
                 oldlogs: this._oldhtmllogs.join(os.EOL),
             });
             return cached_content;
@@ -186,6 +192,16 @@ class LogcatContent {
         vars = Object.assign({
             logcatid: this._logcatid,
             wssport: Server.options.port,
+            lFilterPlaceholder: loc('logcat.filterPlaceholder', 'Filter regex (e.g. word|error)'),
+            lFilterTitle: loc('logcat.filterTitle', 'Filter regex'),
+            lPause: loc('logcat.pause', 'Pause / resume'),
+            lAutoScroll: loc('logcat.autoScroll', 'Auto-scroll to newest'),
+            lClear: loc('logcat.clear', 'Clear logcat'),
+            lLevel: loc('logcat.level', 'Level:'),
+            lShown: loc('logcat.shown', 'shown {0} / {1}'),
+            lConnecting: loc('logcat.connecting', 'Connecting...'),
+            lConnectionError: loc('logcat.connectionError', 'Connection error'),
+            lInvalidRegex: loc('logcat.invalidRegex', 'Invalid regular expression'),
         }, vars);
         // simple value replacement using !{name} as the placeholder
         const html = this._htmltemplate.replace(/!\{(.*?)\}/g, (match,expr) => ''+(vars[expr.trim()]||''));
@@ -301,6 +317,8 @@ function onWebSocketClientConnection(client, req) {
 }
 
 /**
+ * DEPRECATED: the sidebar Logcat view (android-devtools.logcat) is used instead
+ * of a separate webview panel. Kept only for reference.
  * @param {import('vscode')} vscode 
  * @param {*} target_device 
  */
@@ -320,6 +338,7 @@ function openWebviewLogcatWindow(vscode, target_device) {
 }
 
 /**
+ * DEPRECATED: legacy previewHtml fallback - kept only for reference.
  * @param {import('vscode')} vscode 
  * @param {*} target_device 
  */
@@ -332,25 +351,15 @@ function openPreviewHtmlLogcatWindow(vscode, target_device) {
  * @param {import('vscode')} vscode 
  */
 async function openLogcatWindow(vscode) {
+    // Open the SIDEBAR Logcat view (android-devtools.logcat) instead of creating
+    // a separate webview panel/editor tab. Previously every call spawned a new
+    // page, so "Launch + Logcat" ended up with two logcat windows side by side.
+    // The sidebar view (src/logcatView.js LogcatViewProvider) handles ADB checks
+    // and device selection itself when it resolves.
     try {
-        // if adb is not running, see if we can start it ourselves
-        const autoStartADB = AndroidContentProvider.getLaunchConfigSetting('autoStartADB', true);
-        await checkADBStarted(autoStartADB);
-
-        let target_device = await selectTargetDevice(vscode, "Logcat display");
-        if (!target_device) {
-            return;
-        }
-
-        if (vscode.window.createWebviewPanel) {
-            // newer versions of vscode use WebviewPanels
-            openWebviewLogcatWindow(vscode, target_device);
-        } else {
-            // older versions of vscode use previewHtml
-            openPreviewHtmlLogcatWindow(vscode, target_device);
-        }
+        await vscode.commands.executeCommand('android-devtools.logcat.focus');
     } catch (e) {
-        vscode.window.showInformationMessage(`Logcat cannot be displayed. ${e.message}`);
+        vscode.window.showInformationMessage(loc('logcat.cannotDisplay', 'Logcat cannot be displayed: {0}', e.message));
     }
 }
 

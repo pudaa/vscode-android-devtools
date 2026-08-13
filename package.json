@@ -51,17 +51,20 @@
                 {
                     "id": "android-devtools.launch",
                     "name": "%view.control.name%",
-                    "icon": "media/play.svg"
+                    "icon": "media/play.svg",
+                    "type": "webview"
                 },
                 {
                     "id": "android-devtools.logcat",
                     "name": "%view.logcat.name%",
-                    "icon": "media/logcat.svg"
+                    "icon": "media/logcat.svg",
+                    "type": "webview"
                 },
                 {
                     "id": "android-devtools.settings",
                     "name": "%view.settings.name%",
-                    "icon": "media/gear.svg"
+                    "icon": "media/gear.svg",
+                    "type": "webview"
                 }
             ]
         },

@@ -9,6 +9,7 @@ const vscode = require('vscode');
 const { LogcatContent } = require('./logcat');
 const { checkADBStarted } = require('./utils/android');
 const { selectTargetDevice } = require('./utils/device');
+const i18n = require('./i18n');
 
 /**
  * @type {Map<string, LogcatContent>}
@@ -36,6 +37,7 @@ class LogcatViewProvider {
      * @param {vscode.CancellationToken} _token
      */
     async resolveWebviewView(webviewView, _context, _token) {
+        console.log('[android-dev-ext] LogcatViewProvider.resolveWebviewView(): called');
         this._view = webviewView;
         webviewView.webview.options = {
             enableScripts: true,
@@ -44,19 +46,29 @@ class LogcatViewProvider {
         // connect to the device (auto-pick if only one, else ask)
         const autoStartADB = true;
         try {
-            await checkADBStarted(autoStartADB);
+            console.log('[android-dev-ext] LogcatViewProvider: checking ADB...');
+            const adbStarted = await checkADBStarted(autoStartADB);
+            if (!adbStarted) {
+                console.error('[android-dev-ext] LogcatViewProvider: ADB server could not be started');
+                webviewView.webview.html = this.renderPlaceholder(i18n.localize('logcat.adbStartFailed', 'ADB server could not be started. Set ANDROID_HOME or add adb to PATH.'));
+                return;
+            }
+            console.log('[android-dev-ext] LogcatViewProvider: ADB OK, selecting device...');
             const device = await selectTargetDevice(vscode, 'Logcat display');
+            console.log('[android-dev-ext] LogcatViewProvider: device =', device && device.serial);
             if (!device) {
-                webviewView.webview.html = this.renderPlaceholder('No device connected');
+                webviewView.webview.html = this.renderPlaceholder(i18n.localize('logcat.noDevice', 'No device connected'));
                 return;
             }
             currentDevice = device.serial;
             this._logcat = new LogcatContent(device.serial);
             const html = await this._logcat.content();
+            console.log('[android-dev-ext] LogcatViewProvider: logcat html length =', html.length);
             webviewView.webview.html = html;
             this.attachMessageHandler(webviewView);
         } catch (e) {
-            webviewView.webview.html = this.renderPlaceholder(`Logcat init failed: ${e.message}`);
+            console.error('[android-dev-ext] LogcatViewProvider.resolveWebviewView() failed:', e);
+            webviewView.webview.html = this.renderPlaceholder(i18n.localize('logcat.initFailed', 'Logcat init failed: {0}', e.message));
         }
     }
 
@@ -76,7 +88,7 @@ class LogcatViewProvider {
                         webviewView.webview.html = html;
                     }
                 } catch (e) {
-                    vscode.window.showInformationMessage(`Logcat refresh failed: ${e.message}`);
+                    vscode.window.showInformationMessage(i18n.localize('logcat.refreshFailed', 'Logcat refresh failed: {0}', e.message));
                 }
             }
         });
@@ -90,7 +102,7 @@ class LogcatViewProvider {
         return `<!DOCTYPE html><html><head><meta charset="utf8"></head>
 <body style="font-family:var(--vscode-font-family);color:var(--vscode-foreground);padding:12px">
 <div style="opacity:.8;font-size:.95em">${message}</div>
-<div style="margin-top:12px"><button class="g" onclick="(function(){var v=acquireVsCodeApi();v.postMessage({command:'refresh'});})()">Retry / Refresh</button></div>
+<div style="margin-top:12px"><button class="g" onclick="(function(){var v=acquireVsCodeApi();v.postMessage({command:'refresh'});})()">${i18n.localize('logcat.retry', 'Retry / Refresh')}</button></div>
 </body></html>`;
     }
 }

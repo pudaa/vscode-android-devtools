@@ -52,7 +52,10 @@ async function createLanguageClient(context, uid, session_id, vscode_props) {
   }
   let sourceFiles = [];
   try {
-      sourceFiles = (await vscode.workspace.findFiles(`${globSearchRoot}**/*.java`, null, 1000, null)).map(uri => uri.toString());
+      // NOTE: do NOT pass null as the CancellationToken (4th arg) - newer VS Code
+      // versions dereference token.isCancellationRequested and throw
+      // "Cannot read properties of null". Omit the token entirely instead.
+      sourceFiles = (await vscode.workspace.findFiles(`${globSearchRoot}**/*.java`, null, 1000)).map(uri => uri.toString());
   } catch (e) {
       // findFiles can throw when the workspace has no matching root or in untrusted workspaces.
       // The language server is optional - never let this break extension activation.
@@ -124,11 +127,14 @@ function refreshLanguageServerEnabledState() {
  */
 function activate(context) {
 
+    console.log('[android-dev-ext] activate(): START');
+
     // load i18n string table (en default, zh-cn supported)
     i18n.load(context);
 
     /* Only the logcat stuff is configured here. The debugger is launched from src/debugMain.js  */
     AndroidContentProvider.register(context, vscode.workspace);
+    console.log('[android-dev-ext] activate(): content provider registered');
 
     const { uid } = analytics.getIDs(context);
     const session_id = Math.trunc(Math.random() * Number.MAX_SAFE_INTEGER);
@@ -155,71 +161,97 @@ function activate(context) {
                 console.warn('Android DevTools: language server init skipped/failed:', err && err.message);
             });
     }, 0);
+    console.log('[android-dev-ext] activate(): language server scheduled (background)');
 
     // The commandId parameter must match the command field in package.json
-    const disposables = [
-        // add the view logcat handler
-        vscode.commands.registerCommand('android-dev-ext.view_logcat', () => {
-            openLogcatWindow(vscode);
-        }),
-        vscode.commands.registerCommand('PickAndroidDevice', async (launchConfig) => {
-            // if the config has both PickAndroidDevice and PickAndroidProcess, ignore this
-            // request as PickAndroidProcess already includes chooosing a device...
-            if (launchConfig && launchConfig.processId === '${command:PickAndroidProcess}') {
-                return '';
-            }
-            const device = await selectTargetDevice(vscode, "Launch", { alwaysShow:true });
-            // the debugger requires a string value to be returned
-            return JSON.stringify(device);
-        }),
-        // add the process picker handler - used to choose a PID to attach to
-        vscode.commands.registerCommand('PickAndroidProcess', async (launchConfig) => {
-            // if the config has a targetDevice specified, use it instead of choosing a device...
-            let target_device = '';
-            if (launchConfig && typeof launchConfig.targetDevice === 'string') {
-                target_device = launchConfig.targetDevice;
-            }
-            const explicit_pick_device = target_device === '${command:PickAndroidDevice}';
-            if (!target_device || explicit_pick_device) {
-                // no targetDevice (or it's set to ${command:PickAndroidDevice})
-                const device = await selectTargetDevice(vscode, 'Attach', { alwaysShow: explicit_pick_device });
-                if (!device) {
-                    return JSON.stringify({status: 'cancelled'});
-                }
-                target_device = device.serial;
-            }
-            const o = await selectAndroidProcessID(vscode, target_device);
-            // the debugger requires a string value to be returned
-            return JSON.stringify(o);
-        }),
+    const disposables = [];
 
-        // register sidebar views
-        vscode.window.registerWebviewViewProvider('android-devtools.launch', new LaunchViewProvider(context), {
-            webviewOptions: { retainContextWhenHidden: true },
-        }),
-        vscode.window.registerWebviewViewProvider('android-devtools.logcat', new LogcatViewProvider(context), {
-            webviewOptions: { retainContextWhenHidden: true },
-        }),
-        vscode.window.registerWebviewViewProvider('android-devtools.settings', new SettingsViewProvider(context), {
-            webviewOptions: { retainContextWhenHidden: true },
-        }),
-
-        vscode.workspace.onDidChangeConfiguration(e => {
-            // perform the refresh on the next tick to prevent spurious errors when
-            // trying to shut down the language server in the middle of a change-configuration request
-            process.nextTick(() => refreshLanguageServerEnabledState());
-        }),
-
-        // when a debug session with openLogcatAfterLaunch finishes launching the app,
-        // the debug adapter sends this custom event so we auto-open the logcat panel
-        vscode.debug.onDidReceiveDebugSessionCustomEvent(e => {
-            if (e.event === 'androiddevtools.openLogcat') {
-                openLogcatWindow(vscode);
-            }
-        }),
+    // Register sidebar views FIRST - these are the primary feature and must be
+    // registered even if anything else fails later. Each registration is isolated
+    // with try/catch so a failure in one view can never break the others.
+    // (A missed/failed registration is exactly what shows "No data provider
+    // registered that can provide view data" in the sidebar.)
+    const viewProviders = [
+        ['android-devtools.launch', new LaunchViewProvider(context)],
+        ['android-devtools.logcat', new LogcatViewProvider(context)],
+        ['android-devtools.settings', new SettingsViewProvider(context)],
     ];
+    for (const [viewId, provider] of viewProviders) {
+        try {
+            disposables.push(vscode.window.registerWebviewViewProvider(viewId, provider, {
+                retainContextWhenHidden: true,
+            }));
+            console.log(`[android-dev-ext] activate(): registered sidebar view: ${viewId}`);
+        } catch (e) {
+            console.error(`[android-dev-ext] activate(): FAILED to register sidebar view ${viewId}:`, e);
+        }
+    }
+
+    // Commands - isolated so a single bad registration (e.g. a conflicting
+    // command from another extension) can never break view registration.
+    try {
+        disposables.push(
+            // add the view logcat handler
+            vscode.commands.registerCommand('android-dev-ext.view_logcat', () => {
+                openLogcatWindow(vscode);
+            }),
+            vscode.commands.registerCommand('PickAndroidDevice', async (launchConfig) => {
+                // if the config has both PickAndroidDevice and PickAndroidProcess, ignore this
+                // request as PickAndroidProcess already includes chooosing a device...
+                if (launchConfig && launchConfig.processId === '${command:PickAndroidProcess}') {
+                    return '';
+                }
+                const device = await selectTargetDevice(vscode, "Launch", { alwaysShow:true });
+                // the debugger requires a string value to be returned
+                return JSON.stringify(device);
+            }),
+            // add the process picker handler - used to choose a PID to attach to
+            vscode.commands.registerCommand('PickAndroidProcess', async (launchConfig) => {
+                // if the config has a targetDevice specified, use it instead of choosing a device...
+                let target_device = '';
+                if (launchConfig && typeof launchConfig.targetDevice === 'string') {
+                    target_device = launchConfig.targetDevice;
+                }
+                const explicit_pick_device = target_device === '${command:PickAndroidDevice}';
+                if (!target_device || explicit_pick_device) {
+                    // no targetDevice (or it's set to ${command:PickAndroidDevice})
+                    const device = await selectTargetDevice(vscode, 'Attach', { alwaysShow: explicit_pick_device });
+                    if (!device) {
+                        return JSON.stringify({status: 'cancelled'});
+                    }
+                    target_device = device.serial;
+                }
+                const o = await selectAndroidProcessID(vscode, target_device);
+                // the debugger requires a string value to be returned
+                return JSON.stringify(o);
+            }),
+        );
+    } catch (e) {
+        console.error('[android-dev-ext] activate(): command registration failed:', e);
+    }
+
+    // Configuration / debug-session listeners - isolated for the same reason.
+    try {
+        disposables.push(
+            vscode.workspace.onDidChangeConfiguration(e => {
+                // perform the refresh on the next tick to prevent spurious errors when
+                // trying to shut down the language server in the middle of a change-configuration request
+                process.nextTick(() => refreshLanguageServerEnabledState());
+            }),
+            // when a debug session with openLogcatAfterLaunch finishes launching the app,
+            // the debug adapter sends this custom event so we auto-open the logcat panel
+            vscode.debug.onDidReceiveDebugSessionCustomEvent(e => {
+                if (e.event === 'androiddevtools.openLogcat') {
+                    openLogcatWindow(vscode);
+                }
+            }),
+        );
+    } catch (e) {
+        console.error('[android-dev-ext] activate(): listener registration failed:', e);
+    }
 
     context.subscriptions.splice(context.subscriptions.length, 0, ...disposables);
+    console.log('[android-dev-ext] activate(): DONE - subscriptions:', context.subscriptions.length);
 }
 
 // this method is called when your extension is deactivated

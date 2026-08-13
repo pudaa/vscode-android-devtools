@@ -7,6 +7,7 @@
 const vscode = require('vscode');
 const { AndroidContentProvider } = require('./contentprovider');
 const { openLogcatWindow } = require('./logcat');
+const i18n = require('./i18n');
 
 /**
  * Read the current android launch configuration from launch.json (first match)
@@ -36,9 +37,12 @@ class LaunchViewProvider {
      * @param {vscode.WebviewView} webviewView
      */
     resolveWebviewView(webviewView) {
+        console.log('[android-dev-ext] LaunchViewProvider.resolveWebviewView(): called');
         this._view = webviewView;
         webviewView.webview.options = { enableScripts: true };
-        webviewView.webview.html = this.render();
+        const html = this.render();
+        console.log('[android-dev-ext] LaunchViewProvider.resolveWebviewView(): html length =', html.length);
+        webviewView.webview.html = html;
 
         webviewView.webview.onDidReceiveMessage(async (message) => {
             switch (message.command) {
@@ -71,7 +75,7 @@ class LaunchViewProvider {
     async launchWithLogcat() {
         const config = getAndroidLaunchConfig();
         if (!config) {
-            vscode.window.showErrorMessage('No Android launch configuration found. Add one in launch.json first.');
+            vscode.window.showErrorMessage(i18n.localize('logcat.launchFailed', 'No Android launch configuration found. Add one in launch.json first.'));
             return;
         }
         if (config.openLogcatAfterLaunch) {
@@ -120,7 +124,7 @@ class LaunchViewProvider {
     render() {
         const config = getAndroidLaunchConfig();
         const cfg = config || {};
-        const appName = cfg.name || '(no android launch config)';
+        const appName = cfg.name || i18n.localize('control.noConfig', '(no android launch config)');
         const openLogcatFlag = cfg.openLogcatAfterLaunch === true;
         const apk = cfg.apkFile || '';
         const activity = cfg.launchActivity || '';
@@ -143,17 +147,17 @@ body { font-family: var(--vscode-font-family); font-size: var(--vscode-font-size
 .badge.off { background: var(--vscode-inputValidation-warningBackground, #531); color: var(--vscode-inputValidation-warningForeground, #fc0); }
 </style></head><body>
 <div class="card">
-  <h3>Android App</h3>
-  <div class="row"><span class="label">Config</span><span class="value">${escapeHtml(appName)}</span></div>
-  <div class="row"><span class="label">Logcat</span><span class="badge ${openLogcatFlag ? 'on' : 'off'}">${openLogcatFlag ? 'auto-open' : 'manual'}</span></div>
-  <div class="row"><span class="label">APK</span><span class="value">${escapeHtml(apk || '—')}</span></div>
-  <div class="row"><span class="label">Launch</span><span class="value">${escapeHtml(activity || 'launcher activity')}</span></div>
+  <h3>${i18n.localize('control.config', 'Android App')}</h3>
+  <div class="row"><span class="label">${i18n.localize('control.configValue', 'Config')}</span><span class="value">${escapeHtml(appName)}</span></div>
+  <div class="row"><span class="label">${i18n.localize('control.logcatMode', 'Logcat')}</span><span class="badge ${openLogcatFlag ? 'on' : 'off'}">${openLogcatFlag ? i18n.localize('control.logcatAuto', 'auto-open') : i18n.localize('control.logcatManual', 'manual')}</span></div>
+  <div class="row"><span class="label">${i18n.localize('control.apk', 'APK')}</span><span class="value">${escapeHtml(apk || '—')}</span></div>
+  <div class="row"><span class="label">${i18n.localize('control.activity', 'Launch')}</span><span class="value">${escapeHtml(activity || i18n.localize('control.launcherActivity', 'launcher activity'))}</span></div>
 </div>
 
-<button class="btn" id="btnLogcat" data-cmd="launch-logcat">▶ Launch + Logcat</button>
-<button class="btn" id="btnDebug" data-cmd="launch-debug">🐞 Launch + Debug</button>
-<button class="btn secondary" id="btnOpenLogcat" data-cmd="open-logcat">View Logcat</button>
-<button class="btn secondary" id="btnLaunchJson" data-cmd="open-launchjson">Edit launch.json</button>
+<button class="btn" id="btnLogcat" data-cmd="launch-logcat">${i18n.localize('control.btnLaunchLogcat', '▶ Launch + Logcat')}</button>
+<button class="btn" id="btnDebug" data-cmd="launch-debug">${i18n.localize('control.btnLaunchDebug', 'Debug Launch')}</button>
+<button class="btn secondary" id="btnOpenLogcat" data-cmd="open-logcat">${i18n.localize('control.btnViewLogcat', 'View Logcat')}</button>
+<button class="btn secondary" id="btnLaunchJson" data-cmd="open-launchjson">${i18n.localize('control.btnEditLaunchJson', 'Edit launch.json')}</button>
 
 <script>
 const vscode = acquireVsCodeApi();

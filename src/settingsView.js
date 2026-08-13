@@ -6,6 +6,7 @@
  */
 const vscode = require('vscode');
 const { getAndroidLaunchConfig } = require('./controlView');
+const i18n = require('./i18n');
 
 class SettingsViewProvider {
     /**
@@ -17,9 +18,12 @@ class SettingsViewProvider {
     }
 
     resolveWebviewView(webviewView) {
+        console.log('[android-dev-ext] SettingsViewProvider.resolveWebviewView(): called');
         this._view = webviewView;
         webviewView.webview.options = { enableScripts: true };
-        webviewView.webview.html = this.render();
+        const html = this.render();
+        console.log('[android-dev-ext] SettingsViewProvider.resolveWebviewView(): html length =', html.length);
+        webviewView.webview.html = html;
 
         webviewView.webview.onDidReceiveMessage(async (message) => {
             switch (message.command) {
@@ -48,12 +52,12 @@ class SettingsViewProvider {
             const raw = (await vscode.workspace.fs.readFile(file)).toString();
             configs = JSON.parse(raw);
         } catch (e) {
-            vscode.window.showErrorMessage('Cannot read launch.json');
+            vscode.window.showErrorMessage(i18n.localize('settings.cannotRead', 'Cannot read launch.json'));
             return;
         }
         const target = configs.configurations.find(c => c.type === 'android' && c.request === 'launch');
         if (!target) {
-            vscode.window.showErrorMessage('No android launch configuration in launch.json');
+            vscode.window.showErrorMessage(i18n.localize('settings.noConfig', 'No android launch configuration in launch.json'));
             return;
         }
         target[key] = value;
@@ -85,33 +89,33 @@ body { font-family: var(--vscode-font-family); font-size: var(--vscode-font-size
 .btn:hover { background:var(--vscode-button-hoverBackground); }
 </style></head><body>
 <div class="field">
-  <label>Launch configuration</label>
+  <label>${i18n.localize('settings.launchConfig', 'Launch configuration')}</label>
   <input type="text" id="cfgName" value="${escapeAttr(cfg.name || '')}" data-key="name"/>
 </div>
 <div class="check">
   <input type="checkbox" id="openLogcat" ${openLogcat ? 'checked' : ''} data-key="openLogcatAfterLaunch"/>
-  <label for="openLogcat">Open Logcat after launch (no debugger)</label>
+  <label for="openLogcat">${i18n.localize('settings.openLogcatAfterLaunch', 'Open Logcat after launch (no debugger)')}</label>
 </div>
 <div class="field">
-  <label>APK file</label>
+  <label>${i18n.localize('settings.apkFile', 'APK file')}</label>
   <input type="text" data-key="apkFile" value="${escapeAttr(apk)}"/>
-  <div class="hint">Path to the built debug APK</div>
+  <div class="hint">${i18n.localize('settings.apkFileHint', 'Path to the built debug APK')}</div>
 </div>
 <div class="field">
-  <label>Launch activity</label>
+  <label>${i18n.localize('settings.launchActivity', 'Launch activity')}</label>
   <input type="text" data-key="launchActivity" value="${escapeAttr(activity)}"/>
-  <div class="hint">e.g. .ui.MainActivity (leave empty for launcher activity)</div>
+  <div class="hint">${i18n.localize('settings.launchActivityHint', 'e.g. .ui.MainActivity (leave empty for launcher activity)')}</div>
 </div>
 <div class="field">
-  <label>ADB socket</label>
+  <label>${i18n.localize('settings.adbSocket', 'ADB socket')}</label>
   <input type="text" data-key="adbSocket" value="${escapeAttr(adb)}"/>
 </div>
 <div class="field">
-  <label>pm install args</label>
+  <label>${i18n.localize('settings.pmInstallArgs', 'pm install args')}</label>
   <input type="text" data-key="pmInstallArgs" value="${escapeAttr(pmArgs)}"/>
-  <div class="hint">space-separated, e.g. -r -d</div>
+  <div class="hint">${i18n.localize('settings.pmInstallArgsHint', 'space-separated, e.g. -r -d')}</div>
 </div>
-<button class="btn" id="save">Save to launch.json</button>
+<button class="btn" id="save">${i18n.localize('settings.save', 'Save to launch.json')}</button>
 <script>
 const vscode = acquireVsCodeApi();
 const save = document.getElementById('save');
