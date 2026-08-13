@@ -18,6 +18,7 @@
         "theme": "dark"
     },
     "activationEvents": [
+        "onStartupFinished",
         "onCommand:android-dev-ext.view_logcat",
         "onCommand:PickAndroidDevice",
         "onCommand:PickAndroidProcess",
