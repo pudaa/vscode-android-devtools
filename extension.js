@@ -174,6 +174,14 @@ function activate(context) {
             // trying to shut down the language server in the middle of a change-configuration request
             process.nextTick(() => refreshLanguageServerEnabledState());
         }),
+
+        // when a debug session with openLogcatAfterLaunch finishes launching the app,
+        // the debug adapter sends this custom event so we auto-open the logcat panel
+        vscode.debug.onDidReceiveDebugSessionCustomEvent(e => {
+            if (e.event === 'androiddevtools.openLogcat') {
+                openLogcatWindow(vscode);
+            }
+        }),
     ];
 
     context.subscriptions.splice(context.subscriptions.length, 0, ...disposables);

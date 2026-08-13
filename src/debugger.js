@@ -142,6 +142,21 @@ class Debugger extends EventEmitter {
     }
 
     /**
+     * Launch the app without attaching the debugger (logcat-only mode).
+     * Used by the 'openLogcatAfterLaunch' launch configuration option.
+     * @param {LaunchBuildInfo} build
+     * @param {string} deviceid
+     */
+    async startDebugSessionNoAttach(build, deviceid) {
+        if (this.status() !== 'disconnected') {
+            throw new Error('startDebugSession: session already active');
+        }
+        this.session = new DebugSession(build, deviceid);
+        // run 'am start' only - do not scan for JDWP processes or connect
+        return Debugger.runApp(deviceid, build.startCommandArgs, build.postLaunchPause);
+    }
+
+    /**
      * @param {AttachBuildInfo} build
      * @param {number} pid process ID to connect to
      * @param {string} deviceid device ID to connect to

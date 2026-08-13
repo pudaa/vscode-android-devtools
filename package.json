@@ -2,7 +2,7 @@
     "name": "vscode-android-devtools",
     "displayName": "Android DevTools",
     "description": "Android debugging support for VS Code (community-maintained fork of android-dev-ext)",
-    "version": "1.4.1",
+    "version": "1.5.0",
     "publisher": "pudaa",
     "preview": true,
     "license": "MIT",
@@ -291,6 +291,11 @@
                                 "type": "string",
                                 "description": "Manually specify the activity to run when the app is started.",
                                 "default": ""
+                            },
+                            "openLogcatAfterLaunch": {
+                                "type": "boolean",
+                                "description": "Launch the app and automatically open the logcat panel without attaching the debugger. Use this when you just want to run the app and watch its logs (no debugging). The logcat buffer is cleared first so only logs from this launch are shown.",
+                                "default": false
                             },
                             "logcatPort": {
                                 "type": "integer",

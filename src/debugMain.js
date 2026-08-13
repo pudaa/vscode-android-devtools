@@ -1,6 +1,6 @@
 const {
 	DebugSession,
-	InitializedEvent, TerminatedEvent, StoppedEvent, BreakpointEvent, ThreadEvent, OutputEvent,
+	InitializedEvent, TerminatedEvent, StoppedEvent, BreakpointEvent, ThreadEvent, OutputEvent, Event,
     Thread, StackFrame, Scope, Source, Breakpoint } = require('@vscode/debugadapter');
 
 // node and external modules
@@ -587,6 +587,33 @@ class AndroidDebugSession extends DebugSession {
 
             // try and determine the relevant path for the API sources (based upon the API level of the connected device)
             await this.configureAPISourcePath();
+
+            // ── openLogcatAfterLaunch 模式：仅启动应用并自动打开 logcat，不附加调试器 ──
+            if (args.openLogcatAfterLaunch) {
+                // 先清空 logcat，让打开的日志面板只显示本次启动产生的日志
+                try {
+                    await this._device.adbclient.shell_cmd({ command: 'logcat -c' });
+                } catch (e) {
+                    D('logcat -c failed: ' + (e.message || e.msg));
+                }
+                const build = new LaunchBuildInfo(
+                    new Map(this.src_packages.packages),
+                    this.apk_file_info.manifest.package,
+                    launchActivity,
+                    this.am_start_args,
+                    args.postLaunchPause);
+                this.LOG(`Launching on device ${this._device.serial} [API:${this.device_api_level||'?'}] (logcat-only)`);
+                if (this.am_start_args) {
+                    this.LOG(`Using custom launch arguments '${this.am_start_args.join(' ')}'`);
+                }
+                const am_stdout = await this.dbgr.startDebugSessionNoAttach(build, this._device.serial);
+                this.LOG(am_stdout);
+                // 通知扩展自动打开 logcat 面板
+                this.sendEvent(new Event('androiddevtools.openLogcat', {}));
+                this.sendResponse(response);
+                this.sendEvent(new TerminatedEvent(true));
+                return;
+            }
 
             // launch the app
             await this.startLaunchActivity(args.launchActivity, args.postLaunchPause);

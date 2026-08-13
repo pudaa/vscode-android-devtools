@@ -6,11 +6,28 @@
 
 Android 应用的 VS Code 调试扩展(预览版)。基于 JDWP + ADB,支持在 VS Code 环境中安装、启动和调试 Android 应用。
 
-## 相对原版的维护更新 (1.4.1)
+## 相对原版的维护更新
 
-- **修复**:F5 调试时应用更新(覆盖安装)后偶发不自动重新进入 —— 将"一次查询可调试进程"改为"轮询等待目标进程(30s)",兼容冷启动较慢的场景
-- **修复**:Logcat 默认采集全部系统日志 —— 新增 `logcatFilter` launch 配置项,支持按 PID/TAG 过滤(如 `--pid=$(pidof com.example.app)`)
-- **修复**:Logcat 日志量增大后界面越来越卡 —— 前端限制 DOM 节点上限(2000 行),后端历史缓存收窄
+- **新增 (1.5.0)**: `openLogcatAfterLaunch` 启动配置项 —— 只想运行 App 看日志时,按 F5 安装并启动应用后**自动打开 Logcat 面板**,且**不附加调试器**。Logcat 会先被清空,只显示本次启动的日志。
+- **修复 (1.4.1)**: F5 调试时应用更新(覆盖安装)后偶发不自动重新进入 —— 将"一次查询可调试进程"改为"轮询等待目标进程(30s)",兼容冷启动较慢的场景
+- **修复 (1.4.1)**: Logcat 默认采集全部系统日志 —— 新增 `logcatFilter` launch 配置项,支持按 PID/TAG 过滤(如 `--pid=$(pidof com.example.app)`)
+- **修复 (1.4.1)**: Logcat 日志量增大后界面越来越卡 —— 前端限制 DOM 节点上限(2000 行),后端历史缓存收窄
+
+### 使用示例：只看日志（不调试）
+
+在 `launch.json` 的 Android 启动配置中加一行：
+
+```jsonc
+{
+    "type": "android",
+    "request": "launch",
+    "name": "Launch App & View Logcat",
+    "openLogcatAfterLaunch": true,
+    // ...其余配置同普通启动（appSrcRoot / apkFile 等）
+}
+```
+
+按 F5 后：构建 → 安装 APK → 清空 logcat → 启动应用 → 自动打开 Logcat 面板（不进入调试模式）。
 
 ## What's New
 - Java Intellisense for Android is now in beta.
