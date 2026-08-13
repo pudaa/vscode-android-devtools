@@ -1,6 +1,16 @@
-# Android for VS Code
+# Android DevTools for VS Code
 
-This is a preview version of the Android for VS Code Extension. The extension allows developers to install, launch and debug Android Apps from within the VS Code environment.
+> **Fork 声明**
+> 本项目是 [adelphes/android-dev-ext](https://github.com/adelphes/android-dev-ext)(MIT License, Copyright (c) 2017 Dave Holoway)的社区维护分支,在原版 1.4.0 基础上继续修复问题。感谢原作者 Dave Holoway 的开源贡献。
+> 原版权声明见 [LICENSE](LICENSE)。
+
+Android 应用的 VS Code 调试扩展(预览版)。基于 JDWP + ADB,支持在 VS Code 环境中安装、启动和调试 Android 应用。
+
+## 相对原版的维护更新 (1.4.1)
+
+- **修复**:F5 调试时应用更新(覆盖安装)后偶发不自动重新进入 —— 将"一次查询可调试进程"改为"轮询等待目标进程(30s)",兼容冷启动较慢的场景
+- **修复**:Logcat 默认采集全部系统日志 —— 新增 `logcatFilter` launch 配置项,支持按 PID/TAG 过滤(如 `--pid=$(pidof com.example.app)`)
+- **修复**:Logcat 日志量增大后界面越来越卡 —— 前端限制 DOM 节点上限(2000 行),后端历史缓存收窄
 
 ## What's New
 - Java Intellisense for Android is now in beta.

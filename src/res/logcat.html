@@ -57,6 +57,17 @@
                 const start = () => {
                     var rows = getId('rows'), filter = getId('q');
                     var last_known_scroll_position=0, selectall=0, logcount=0, prevlc=0, currfilter,ws;
+                    // Cap the number of rendered log rows so the page doesn't get slower
+                    // as logs accumulate (DOM nodes were previously never removed).
+                    var MAX_LOG_ROWS = 2000;
+                    var trimLogRows = function(rows) {
+                        var all = rows.getElementsByClassName('log');
+                        while (all.length > MAX_LOG_ROWS) {
+                            var last = all[all.length - 1];
+                            if (last && last.parentNode) last.parentNode.removeChild(last);
+                            else break;
+                        }
+                    };
                     var selecttext = (rows) => {
                         if (!rows) return window.getSelection().empty();
                         var range = document.createRange();
@@ -170,6 +181,8 @@
                                 rows.insertAdjacentHTML('afterbegin',rawlogs);
                                 var logs = rows.firstElementChild.getElementsByClassName('log');
                                 logcount += logs.length;
+                                // keep the DOM bounded - drop the oldest rows to avoid slowdowns
+                                trimLogRows(rows);
                                 // apply the filter to the newly insert elements
                                 if (currfilter) {
                                     for (var i=logs.length-1,m; i>=0; i--) {

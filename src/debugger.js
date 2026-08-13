@@ -90,33 +90,55 @@ class Debugger extends EventEmitter {
         this.session = new DebugSession(build, deviceid);
         const stdout = await Debugger.runApp(deviceid, build.startCommandArgs, build.postLaunchPause);
 
-        // retrieve the list of debuggable processes
-        const named_pids = await Debugger.getDebuggableProcesses(deviceid, 10e3);
-        if (named_pids.length === 0) {
-            throw new Error(`startDebugSession: No debuggable processes after app launch.`);
-        }
-        // we assume the newly launched app is the last pid in the list, but try and
-        // validate using the process names
-        const matched_named_pids = build.pkgname ? named_pids.filter(np => np.name === build.pkgname) : [];
-        let pid;
-        switch (matched_named_pids.length) {
-            case 0:
-                // no name match - warn, but choose the last entry anyway
-                D('No process name match - choosing last jdwp pid');
-                pid = named_pids[named_pids.length - 1].pid;
-                break;
-            case 1:
-                pid = matched_named_pids[0].pid;
-                break;
-            default:
-                // more than one choice - warn, but choose we'll use the last one anyway
-                D('Multiple process names match - choosing last matching entry');
-                pid = matched_named_pids[matched_named_pids.length - 1].pid;
-                break;
-        }
+        // 轮询等待目标进程出现（刚覆盖安装后的冷启动可能较慢），
+        // 避免"应用启动了但调试器没 attach 上"导致的退出/不进入
+        const pid = await Debugger.waitForDebugProcess(build, deviceid, 30e3);
+
         // after connect(), the caller must call resume() to begin
         await this.connect(pid);
         return stdout;
+    }
+
+    /**
+     * 轮询查找目标应用的可调试进程，直到找到匹配包名的进程或超时。
+     * 与旧的"只查询一次(10s)"不同，这里会持续轮询，兼容新安装后的慢速冷启动。
+     * @param {LaunchBuildInfo} build
+     * @param {string} deviceid
+     * @param {number} timeout_ms 总等待超时
+     * @returns {Promise<number>} 目标进程的 pid
+     */
+    static async waitForDebugProcess(build, deviceid, timeout_ms) {
+        const start_time = Date.now();
+        let last_named_pids = [];
+        for (;;) {
+            // 每次查询使用较短的读取超时，便于快速重试
+            const named_pids = await Debugger.getDebuggableProcesses(deviceid, 5e3);
+            if (named_pids.length) {
+                last_named_pids = named_pids;
+            }
+            // 优先精确匹配包名（通常能命中刚启动的应用）
+            if (build.pkgname) {
+                const matched = named_pids.filter(np => np.name === build.pkgname);
+                if (matched.length > 0) {
+                    // 多个匹配时取最后一个（通常是刚启动的那个）
+                    return matched[matched.length - 1].pid;
+                }
+            } else if (named_pids.length > 0) {
+                // 无包名信息时退回"取最后一个"的旧行为
+                D('No process name match - choosing last jdwp pid');
+                return named_pids[named_pids.length - 1].pid;
+            }
+            // 超时检查
+            if (Date.now() - start_time >= timeout_ms) {
+                if (last_named_pids.length > 0) {
+                    D('Timeout waiting for target process - choosing last jdwp pid');
+                    return last_named_pids[last_named_pids.length - 1].pid;
+                }
+                throw new Error(`startDebugSession: No debuggable processes after app launch.`);
+            }
+            // 稍等片刻再查，给应用留出冷启动时间
+            await sleep(1000);
+        }
     }
 
     /**

@@ -295,9 +295,13 @@ class ADBClient {
     async startLogcatMonitor(o) {
         // onlog:function(e)
         // onclose:function(e)
+        // filter: optional logcat filter arguments (e.g. '--pid=1234' or '-s MyTag:*')
+        //   appended to the base command to avoid capturing the whole device's logs.
         await this.connect_to_adb();
         await this.adbsocket.cmd_and_status(`host:transport:${this.deviceid}`);
-        await this.adbsocket.cmd_and_status('shell:logcat -v time');
+        const filter = (o.filter || '').trim();
+        const logcat_command = filter ? `shell:logcat -v time ${filter}` : 'shell:logcat -v time';
+        await this.adbsocket.cmd_and_status(logcat_command);
         // if there's no handler, just read the complete log and finish
         if (!o.onlog) {
             const logcatbuffer = await this.adbsocket.read_stdout();

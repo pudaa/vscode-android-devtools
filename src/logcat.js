@@ -56,6 +56,9 @@ class LogcatContent {
         this._refreshRate = 200;    // ms
         this._state = 'connecting';
         this._htmltemplate = '';
+        // Optional logcat filter (from launch.json 'logcatFilter', e.g. '--pid=1234' or '-s MyTag:*').
+        // Defaults to empty = no filtering (full device log).
+        this._filter = AndroidContentProvider.getLaunchConfigSetting('logcatFilter', '');
         this._adbclient = new ADBClient(deviceid);
         this._initwait = this.initialise();
         LogcatInstances.set(this._logcatid, this);
@@ -75,6 +78,7 @@ class LogcatContent {
             await this._adbclient.startLogcatMonitor({
                 onlog: this.onLogcatContent.bind(this),
                 onclose: this.onLogcatDisconnect.bind(this),
+                filter: this._filter,
             });
             this._state = 'connected';
             this._initwait = null;
@@ -105,6 +109,7 @@ class LogcatContent {
             await this._adbclient.startLogcatMonitor({
                 onlog: this.onLogcatContent.bind(this),
                 onclose: this.onLogcatDisconnect.bind(this),
+                filter: this._filter,
             })
             // we successfully reconnected
             this._state = 'connected';
@@ -170,7 +175,8 @@ class LogcatContent {
             clients.forEach(client => client.send(lines));
         }
         // once we've updated all the clients, discard the info
-        this._oldhtmllogs = this._htmllogs.concat(this._oldhtmllogs).slice(0, 10000);
+        // (kept small to bound memory usage; the frontend also caps its own DOM rows)
+        this._oldhtmllogs = this._htmllogs.concat(this._oldhtmllogs).slice(0, 2500);
         this._htmllogs = [], this._logs = [];
     }
 
