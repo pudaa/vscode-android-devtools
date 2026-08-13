@@ -3,6 +3,20 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Launch Extension (open Memory app)",
+            "type": "extensionHost",
+            "request": "launch",
+            "runtimeExecutable": "${execPath}",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceRoot}",
+                "D:\\Codes\\Memory"
+            ],
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "description": "在扩展开发宿主窗口中调试本插件，并自动打开 Android 测试项目 D:\\Codes\\Memory。此时 Memory 项目自身的 F5 不受影响（互不干扰）。"
+        },
+        {
             "name": "Launch Extension",
             "type": "extensionHost",
             "request": "launch",
