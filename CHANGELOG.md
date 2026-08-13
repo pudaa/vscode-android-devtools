@@ -1,10 +1,16 @@
 # Change Log
 
 ### version 1.5.0
+* NEW: Sidebar UI - Android DevTools activity bar with three views (Launch / Logcat / Settings), no more command-palette-only workflow.
+* NEW: Launch view - one-click "Launch + Logcat" and "Launch + Debug", visual config summary, edit launch.json shortcut.
+* NEW: Settings view - visual editor for the android launch config (apkFile, activity, adbSocket, openLogcatAfterLaunch, pm args).
+* NEW: Logcat is now a sidebar view (draggable to bottom panel as a tab) with an IDEA-style toolbar: level filters (V/D/I/W/E/F), pause, auto-scroll lock, regex filter, structured columns (time/level/PID/TID/tag/message).
+* NEW: i18n - English + Simplified Chinese (package.nls.json / package.nls.zh-cn.json).
+* NEW: Logcat switched to `-v threadtime` output for PID+TID columns.
 * NEW: `openLogcatAfterLaunch` launch option - install/launch the app and auto-open the logcat panel without attaching the debugger (logcat-only mode). Logcat buffer is cleared first so only this launch's logs are shown.
 * (fork maintenance 1.4.1) Debugger: poll for the target process (30s) instead of a single 10s lookup, so the app reliably re-enters after reinstall/relaunch.
 * (fork maintenance 1.4.1) Logcat: new `logcatFilter` launch option (e.g. `--pid=$(pidof <pkg>)`) to limit device-wide log capture.
-* (fork maintenance 1.4.1) Logcat: cap DOM rows at 2000 in the webview + narrow backend history cache to keep the panel responsive.
+* (fork maintenance 1.4.1) Logcat: cap DOM rows in the webview + narrow backend history cache to keep the panel responsive.
 
 ### version 1.3.2
 * Update analytics library

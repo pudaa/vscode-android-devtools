@@ -7,6 +7,10 @@ const package_json = require('./package.json');
 const { LanguageClient, TransportKind, } = require('vscode-languageclient');
 const { AndroidContentProvider } = require('./src/contentprovider');
 const { openLogcatWindow } = require('./src/logcat');
+const { LogcatViewProvider } = require('./src/logcatView');
+const { LaunchViewProvider } = require('./src/controlView');
+const { SettingsViewProvider } = require('./src/settingsView');
+const i18n = require('./src/i18n');
 const { selectAndroidProcessID } = require('./src/process-attach');
 const { selectTargetDevice } = require('./src/utils/device');
 
@@ -112,6 +116,9 @@ function refreshLanguageServerEnabledState() {
  */
 function activate(context) {
 
+    // load i18n string table (en default, zh-cn supported)
+    i18n.load(context);
+
     /* Only the logcat stuff is configured here. The debugger is launched from src/debugMain.js  */
     AndroidContentProvider.register(context, vscode.workspace);
 
@@ -137,7 +144,6 @@ function activate(context) {
         vscode.commands.registerCommand('android-dev-ext.view_logcat', () => {
             openLogcatWindow(vscode);
         }),
-        // add the device picker handler - used to choose a target device
         vscode.commands.registerCommand('PickAndroidDevice', async (launchConfig) => {
             // if the config has both PickAndroidDevice and PickAndroidProcess, ignore this
             // request as PickAndroidProcess already includes chooosing a device...
@@ -167,6 +173,17 @@ function activate(context) {
             const o = await selectAndroidProcessID(vscode, target_device);
             // the debugger requires a string value to be returned
             return JSON.stringify(o);
+        }),
+
+        // register sidebar views
+        vscode.window.registerWebviewViewProvider('android-devtools.launch', new LaunchViewProvider(context), {
+            webviewOptions: { retainContextWhenHidden: true },
+        }),
+        vscode.window.registerWebviewViewProvider('android-devtools.logcat', new LogcatViewProvider(context), {
+            webviewOptions: { retainContextWhenHidden: true },
+        }),
+        vscode.window.registerWebviewViewProvider('android-devtools.settings', new SettingsViewProvider(context), {
+            webviewOptions: { retainContextWhenHidden: true },
         }),
 
         vscode.workspace.onDidChangeConfiguration(e => {

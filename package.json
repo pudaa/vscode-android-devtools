@@ -21,6 +21,9 @@
         "onCommand:android-dev-ext.view_logcat",
         "onCommand:PickAndroidDevice",
         "onCommand:PickAndroidProcess",
+        "onView:android-devtools.launch",
+        "onView:android-devtools.logcat",
+        "onView:android-devtools.settings",
         "onLanguage:java"
     ],
     "repository": {
@@ -29,6 +32,34 @@
     },
     "main": "./extension",
     "contributes": {
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "android-devtools",
+                    "title": "%android.activitybar%",
+                    "icon": "media/android.svg"
+                }
+            ]
+        },
+        "views": {
+            "android-devtools": [
+                {
+                    "id": "android-devtools.launch",
+                    "name": "%view.control.name%",
+                    "icon": "media/play.svg"
+                },
+                {
+                    "id": "android-devtools.logcat",
+                    "name": "%view.logcat.name%",
+                    "icon": "media/logcat.svg"
+                },
+                {
+                    "id": "android-devtools.settings",
+                    "name": "%view.settings.name%",
+                    "icon": "media/gear.svg"
+                }
+            ]
+        },
         "configuration": {
             "type": "object",
             "title": "Android",
@@ -217,7 +248,15 @@
         "commands": [
             {
                 "command": "android-dev-ext.view_logcat",
-                "title": "Android: View Logcat"
+                "title": "%command.view_logcat%"
+            },
+            {
+                "command": "PickAndroidDevice",
+                "title": "%command.pick_device%"
+            },
+            {
+                "command": "PickAndroidProcess",
+                "title": "%command.pick_process%"
             }
         ],
         "breakpoints": [

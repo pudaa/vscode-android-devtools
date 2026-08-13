@@ -300,7 +300,9 @@ class ADBClient {
         await this.connect_to_adb();
         await this.adbsocket.cmd_and_status(`host:transport:${this.deviceid}`);
         const filter = (o.filter || '').trim();
-        const logcat_command = filter ? `shell:logcat -v time ${filter}` : 'shell:logcat -v time';
+        // use threadtime output: "MM-DD HH:MM:SS.mmm PID TID LEVEL TAG: message"
+        // (closest to the IDEA Logcat view, gives PID + TID columns)
+        const logcat_command = filter ? `shell:logcat -v threadtime ${filter}` : 'shell:logcat -v threadtime';
         await this.adbsocket.cmd_and_status(logcat_command);
         // if there's no handler, just read the complete log and finish
         if (!o.onlog) {

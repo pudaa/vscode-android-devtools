@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf8">
     <style type="text/css">
+        /* ── theme-aware level colors ── */
         .V {color:#777} .vscode-light .V {color:#999} .vscode-high-contrast .V {color:#fff}
         .D {color:#8b8} .vscode-light .D {color:#292} .vscode-high-contrast .D {color:#0a0}
         .I {color:#99a} .vscode-light .I {color:#557} .vscode-high-contrast .I {color:#aaf}
@@ -11,39 +12,94 @@
         .F {color:#f66} .vscode-light .F {color:#f00} .vscode-high-contrast .F {color:#f00}
         .hide {display:none}
         .logblock {display:block}
+        .filter {display:none}
+
+        /* ── layout ── */
         .a {display:flex;flex-direction:column;position:absolute;top:0;bottom:0;left:0;right:0;}
-        .b {flex:0 0 auto;border-bottom: 1px solid rgba(128,128,128,.2); padding-bottom: .2em}
-        .vscode-high-contrast .b {border-color: #0cc}
-        .c {flex: 1 1 auto;overflow:auto;padding-top: .2em}
-        .g {margin:.6em .2em 0 .2em;background: none;border: 1px solid #444; color:#888;padding:.3em .8em;font-size: .9em}
-        .g:hover:enabled {color:#ccc;cursor: pointer} .g:focus:enabled,.g:focus:hover:enabled {color:#eee;cursor: pointer}
-        .vscode-light .g:enabled {color: #666;}
-        .vscode-light .g:hover:enabled,.vscode-light .g:focus:enabled,.vscode-light .g:focus:hover:enabled {color: #333;background: #eee;}
-        .vscode-high-contrast .g:enabled {color: #fff;border-color: #0cc;background:none;}
-        .vscode-high-contrast .g:hover:enabled,.vscode-high-contrast .g:focus:enabled {border-color: darkorange;}
-        .h{display: flex;align-items: center;flex-wrap: wrap;}
-        .log { white-space:nowrap  }
-        .filter { display:none  }
-        body {font-size:.9em}
-        #q {margin:.6em .2em 0 .2em;padding:.3em;width:20em;outline:none;border:solid 1px #444;color: #eee;background:rgba(128,128,128,.05);}
-        #q:hover { border-color: #464; } 
-        #q:focus,#q:focus:hover { border-color: #4a4; }
-        .vscode-light #q {color: #333;border-color: #444;background:none;}
-        .vscode-light #q:hover { border-color: #464; } 
-        .vscode-light #q:focus,.vscode-light #q:focus:hover { border-color: #4a4; }
-        .vscode-high-contrast #q {color: #fff;border-color: #0cc;background:none;}
-        .vscode-high-contrast #q:hover {border-color: darkorange;}
-        .vscode-high-contrast #q:focus,.vscode-high-contrast #q:focus:hover {border-color: darkorange;}
-        #lcount {font-family:monospace;font-size:1em;margin-top:.4em}
-        .vscode-dark  #lcount {color:#484;} .vscode-light #lcount {color:#484;} .vscode-high-contrast #lcount {color:#0d0;}
-        .vscode-dark  #status {color:#eee;} .vscode-light #status {color:#333;} .vscode-high-contrast #status {color:#fff;}
+        .b {flex:0 0 auto;border-bottom:1px solid rgba(128,128,128,.2);padding:.4em .6em .5em .6em;}
+        .c {flex:1 1 auto;overflow:auto;padding:.3em 0;}
+        body {font-family:var(--vscode-font-family);font-size:var(--vscode-font-size);margin:0;}
+
+        /* ── toolbar row ── */
+        .toolbar {display:flex;align-items:center;gap:.4em;flex-wrap:wrap;}
+        .toolbar input[type=text] {flex:1 1 auto;min-width:8em;padding:.3em .5em;outline:none;border:solid 1px #444;color:var(--vscode-input-foreground);background:var(--vscode-input-background);border-radius:3px;}
+        .toolbar input[type=text]:focus {border-color:#4a4;}
+        .vscode-light .toolbar input[type=text] {color:#333;border-color:#444;background:none;}
+        .vscode-high-contrast .toolbar input[type=text] {color:#fff;border-color:#0cc;background:none;}
+
+        /* ── level filter buttons ── */
+        .lvl {padding:.15em .6em;border:1px solid #444;background:none;color:#999;border-radius:3px;cursor:pointer;font-size:.95em;line-height:1.3;}
+        .lvl:hover:enabled {color:#ccc;}
+        .lvl.on {background:#333;color:#fff;}
+        .lvl[data-lvl="V"].on {background:#555;color:#fff;}
+        .lvl[data-lvl="D"].on {background:#2a5;color:#fff;}
+        .lvl[data-lvl="I"].on {background:#256;color:#fff;}
+        .lvl[data-lvl="W"].on {background:#a80;color:#fff;}
+        .lvl[data-lvl="E"].on {background:#b22;color:#fff;}
+        .lvl[data-lvl="F"].on {background:#a00;color:#fff;}
+        .vscode-light .lvl {color:#666;border-color:#bbb;}
+        .vscode-light .lvl:hover:enabled {color:#333;}
+        .vscode-light .lvl.on {color:#fff;}
+        .vscode-high-contrast .lvl {color:#fff;border-color:#0cc;}
+        .vscode-high-contrast .lvl:hover:enabled {border-color:darkorange;}
+
+        /* ── action buttons (pause/clear/scroll) ── */
+        .act {padding:.15em .5em;border:1px solid #444;background:none;color:#aaa;border-radius:3px;cursor:pointer;font-size:.95em;line-height:1.3;}
+        .act:hover:enabled {color:#fff;}
+        .act.on {background:#444;color:#fff;}
+        .act:disabled {opacity:.4;cursor:default;}
+        .vscode-light .act {color:#555;border-color:#bbb;}
+        .vscode-light .act:hover:enabled {color:#000;}
+        .vscode-light .act.on {background:#ccc;color:#000;}
+        .vscode-high-contrast .act {color:#fff;border-color:#0cc;}
+        .vscode-high-contrast .act.on {background:#0cc;color:#000;}
+
+        /* ── log rows ── */
+        .log {white-space:nowrap;display:flex;padding:0 .6em;line-height:1.45;}
+        .log:hover {background:rgba(128,128,128,.12);}
+        .log .t {flex:0 0 auto;color:#888;padding-right:.8em;font-variant-numeric:tabular-nums;}
+        .log .lvl {flex:0 0 1.4em;border:none;padding:0;text-align:center;font-weight:bold;}
+        .log .pid {flex:0 0 auto;color:#6a9;padding-right:.8em;font-variant-numeric:tabular-nums;}
+        .log .tid {flex:0 0 auto;color:#698;padding-right:.8em;font-variant-numeric:tabular-nums;}
+        .log .tag {flex:0 0 auto;color:#c9a;padding-right:.8em;max-width:16em;overflow:hidden;text-overflow:ellipsis;}
+        .log .msg {flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;}
+        .vscode-light .log .t {color:#888;}
+        .vscode-light .log .pid {color:#378;}
+        .vscode-light .log .tid {color:#389;}
+        .vscode-light .log .tag {color:#a56;}
+        .vscode-high-contrast .log .t {color:#aaa;}
+        .vscode-high-contrast .log .pid {color:#6cf;}
+        .vscode-high-contrast .log .tid {color:#5ad;}
+        .vscode-high-contrast .log .tag {color:#f9c;}
+
+        /* ── status / count ── */
+        #lcount {font-family:var(--vscode-font-family);font-size:.9em;margin-top:.3em;color:#6a6;font-variant-numeric:tabular-nums;}
+        .vscode-light #lcount {color:#373;}
+        .vscode-high-contrast #lcount {color:#0d0;}
+        #status {color:var(--vscode-foreground);opacity:.7;padding:.2em .6em;}
+        .sep {flex:1 1 auto;}
     </style>
 </head>
 <body>
     <div class="a">
         <div class="b">
-            <div class="h"><input id="q" placeholder="Filter regex"/><button id="clearlcbtn" class="g" disabled="true">Clear logcat</button></div>
-            <div id="lcount"></div>
+            <div class="toolbar">
+                <input id="q" placeholder="Filter regex (e.g. word|error)" title="Filter regex"/>
+                <button id="pausebtn" class="act" title="Pause / resume">⏸</button>
+                <button id="scrollbtn" class="act on" title="Auto-scroll to newest">⇣</button>
+                <button id="clearlcbtn" class="act" disabled="true" title="Clear logcat">🗑</button>
+            </div>
+            <div class="toolbar" style="margin-top:.35em;">
+                <span style="opacity:.7;font-size:.9em;">Level:</span>
+                <button class="lvl on" data-lvl="V">V</button>
+                <button class="lvl on" data-lvl="D">D</button>
+                <button class="lvl on" data-lvl="I">I</button>
+                <button class="lvl on" data-lvl="W">W</button>
+                <button class="lvl on" data-lvl="E">E</button>
+                <button class="lvl on" data-lvl="F">F</button>
+                <span class="sep"></span>
+                <span id="lcount"></span>
+            </div>
         </div>
         <div id="rc" class="c">
             <div id="status">!{status}</div>
@@ -54,12 +110,61 @@
             (function() {
                 const getId = document.getElementById.bind(document);
                 const setStatus = (x) => { getId('status').textContent = ''+x; }
+
+                /**
+                 * Parse a logcat line into parts.
+                 * Supports both common output formats:
+                 *   threadtime: "MM-DD HH:MM:SS.mmm PID TID LEVEL TAG: message"
+                 *   time:       "MM-DD HH:MM:SS.mmm LEVEL/TagName(PID): message"
+                 * Returns {time, lvl, pid, tid, tag, msg}; falls back gracefully.
+                 */
+                const parseLog = (line) => {
+                    // threadtime: time PID TID LEVEL TAG: msg
+                    let m = line.match(/^(\d\d-\d\d\s+\d\d:\d\d:\d\d\.\d+)\s+(\d+)\s+(\d+)\s+([VDIWEF])\s+([^:]+):\s?(.*)$/);
+                    if (m) {
+                        return { time: m[1], pid: m[2], tid: m[3], lvl: m[4], tag: m[5], msg: m[6] };
+                    }
+                    // time: time LEVEL/Rest
+                    m = line.match(/^(\d\d-\d\d\s+\d\d:\d\d:\d\d\.\d+)\s+([VDIWEF])\/(.*)$/);
+                    if (m) {
+                        const time = m[1], lvl = m[2], rest = m[3];
+                        let pid = '', tid = '', tag = '', msg = rest;
+                        // TagName(PID): msg   or   TagName(PID TID): msg
+                        let m2 = rest.match(/^([^(]+)\(\s*(\d+)(?:\s+(\d+))?\)\s*:\s?(.*)$/);
+                        if (m2) {
+                            tag = m2[1].trim(); pid = m2[2]; tid = m2[3] || ''; msg = m2[4];
+                            return { time, lvl, pid, tid, tag, msg };
+                        }
+                        // PID TID Tag: msg
+                        m2 = rest.match(/^(\d+)\s+(?:\d+\s+)?([^:]+):\s?(.*)$/);
+                        if (m2) {
+                            pid = m2[1]; tag = m2[2].trim(); msg = m2[3];
+                            return { time, lvl, pid, tid, tag, msg };
+                        }
+                        // Tag: msg
+                        m2 = rest.match(/^([^:]+):\s?(.*)$/);
+                        if (m2) {
+                            tag = m2[1].trim(); msg = m2[2];
+                            return { time, lvl, pid, tid, tag, msg };
+                        }
+                        return { time, lvl, pid, tid, tag, msg: rest };
+                    }
+                    // fallback: no timestamp
+                    const m3 = line.match(/\b([VDIWEF])\//);
+                    return { time: '', lvl: (m3 && m3[1]) || '', pid: '', tid: '', tag: '', msg: line };
+                };
+
                 const start = () => {
                     var rows = getId('rows'), filter = getId('q');
                     var last_known_scroll_position=0, selectall=0, logcount=0, prevlc=0, currfilter,ws;
+                    var paused = false;
+                    var autoScroll = true;
+                    var levelFilter = { V:true, D:true, I:true, W:true, E:true, F:true };
+                    var pendingLines = [];
+
                     // Cap the number of rendered log rows so the page doesn't get slower
                     // as logs accumulate (DOM nodes were previously never removed).
-                    var MAX_LOG_ROWS = 2000;
+                    var MAX_LOG_ROWS = 3000;
                     var trimLogRows = function(rows) {
                         var all = rows.getElementsByClassName('log');
                         while (all.length > MAX_LOG_ROWS) {
@@ -68,58 +173,145 @@
                             else break;
                         }
                     };
-                    var selecttext = (rows) => {
+
+                    /**
+                     * Build a structured log row element from a parsed line.
+                     */
+                    const buildRow = (parsed, rawText) => {
+                        const div = document.createElement('div');
+                        div.className = 'log ' + parsed.lvl;
+                        div.dataset.lvl = parsed.lvl;
+                        const t = document.createElement('span');
+                        t.className = 't'; t.textContent = parsed.time;
+                        const l = document.createElement('span');
+                        l.className = 'lvl ' + parsed.lvl; l.textContent = parsed.lvl;
+                        const p = document.createElement('span');
+                        p.className = 'pid'; p.textContent = parsed.pid;
+                        const ti = document.createElement('span');
+                        ti.className = 'tid'; ti.textContent = parsed.tid;
+                        const tg = document.createElement('span');
+                        tg.className = 'tag'; tg.textContent = parsed.tag;
+                        const m = document.createElement('span');
+                        m.className = 'msg'; m.textContent = parsed.msg;
+                        div.appendChild(t); div.appendChild(l); div.appendChild(p); div.appendChild(ti); div.appendChild(tg); div.appendChild(m);
+                        div._text = rawText || [parsed.time, parsed.lvl, parsed.pid, parsed.tid, parsed.tag, parsed.msg].join(' ');
+                        return div;
+                    };
+
+                    // level filter: show/hide based on current levelFilter map
+                    const applyLevelToRow = (row) => {
+                        if (!row) return true;
+                        const visible = levelFilter[row.dataset.lvl] !== false;
+                        row.classList.toggle('filter', !visible);
+                        return visible;
+                    };
+
+                    const refreshLevelFilter = () => {
+                        const all = rows.getElementsByClassName('log');
+                        for (let i = 0; i < all.length; i++) applyAllFilters(all[i]);
+                        updateLogCountDisplay();
+                    };
+
+                    // combined level + regex filter
+                    const applyAllFilters = (row) => {
+                        if (!row) return;
+                        const levelVisible = applyLevelToRow(row);
+                        let regexVisible = true;
+                        if (currfilter) regexVisible = currfilter.test(row._text);
+                        row.classList.toggle('filter', !(levelVisible && regexVisible));
+                    };
+
+                    // render pending lines (called on data, or when unpaused)
+                    const flushPending = () => {
+                        if (paused) return;
+                        if (!pendingLines.length) return;
+                        // insert newest at the top: iterate pending in order, prepend each
+                        for (let i = 0; i < pendingLines.length; i++) {
+                            const line = pendingLines[i];
+                            const parsed = parseLog(line);
+                            const row = buildRow(parsed, line);
+                            applyAllFilters(row);
+                            rows.insertBefore(row, rows.firstChild);
+                        }
+                        logcount += pendingLines.length;
+                        pendingLines.length = 0;
+                        trimLogRows(rows);
+                        updateLogCountDisplay();
+                        if (autoScroll) rows.scrollTop = 0;
+                    };
+
+                    const selecttext = (rows) => {
                         if (!rows) return window.getSelection().empty();
                         var range = document.createRange();
                         range.selectNode(rows);
                         window.getSelection().addRange(range);
                     };
+
+                    // ── toolbar buttons ──
                     getId('clearlcbtn').onclick = (e) => {
                         ws && ws.send('cmd:clear_logcat');
-                    }
+                    };
+                    getId('pausebtn').onclick = (e) => {
+                        paused = !paused;
+                        getId('pausebtn').classList.toggle('on', paused);
+                        if (!paused) flushPending();
+                    };
+                    getId('scrollbtn').onclick = (e) => {
+                        autoScroll = !autoScroll;
+                        getId('scrollbtn').classList.toggle('on', autoScroll);
+                        if (autoScroll) getId('rc').scrollTop = 0;
+                    };
+                    document.querySelectorAll('.lvl[data-lvl]').forEach(btn => {
+                        btn.onclick = () => {
+                            const lvl = btn.dataset.lvl;
+                            levelFilter[lvl] = !levelFilter[lvl];
+                            btn.classList.toggle('on', levelFilter[lvl]);
+                            refreshLevelFilter();
+                        };
+                    });
+
                     getId('rc').onscroll = (e) => {
-                        if ((last_known_scroll_position = e.target.scrollTop)===0) {
+                        last_known_scroll_position = e.target.scrollTop;
+                        if (last_known_scroll_position === 0) {
+                            autoScroll = true;
+                            getId('scrollbtn').classList.add('on');
                             var hidden = document.getElementsByClassName('hide');
                             for (var i=hidden.length-1; i>=0; i--)
                                 hidden[i].className = hidden[i].className.replace(/\bhide\b/g,'').trim();
+                        } else {
+                            autoScroll = false;
+                            getId('scrollbtn').classList.remove('on');
                         }
                     };
+
                     updateLogCountDisplay = () => {
-                        var diff = logcount - prevlc;
-                        if (diff <= 0 || diff > 100) {
-                            prevlc = logcount;
-                            var msg = currfilter ? `${currfilter.matchCounts.true}/${logcount}` : logcount;
-                            getId('lcount').textContent = msg;
-                            return;
+                        var visible = 0;
+                        const all = rows.getElementsByClassName('log');
+                        for (let i = 0; i < all.length; i++) {
+                            if (!all[i].classList.contains('filter')) visible++;
                         }
-                        prevlc++;
-                        var msg = currfilter ? `${currfilter.matchCounts.true}/${prevlc}` : prevlc;
-                        getId('lcount').textContent = msg;
-                        setTimeout(updateLogCountDisplay, 1);
-                    }
+                        getId('lcount').textContent = `shown ${visible} / ${logcount}`;
+                    };
+
                     showFilterErr = (msg) => {
                         filter.style['border-color'] = 'red';
-                    }
+                    };
+
                     updateFilter = (new_filter_source) => {
-                        if (currfilter && currfilter.source === new_filter_source) return;  // nothing's changed
+                        if (currfilter && currfilter.source === new_filter_source) return;
                         var newfilter = null;
                         if (new_filter_source) {
                             try {
                                 newfilter = new RegExp(new_filter_source, 'i');
                                 newfilter.matchCounts = {true:0,false:0};
-                            }
-                            catch(err) { return showFilterErr('Invalid regular expression') }
+                            } catch(err) { return showFilterErr('Invalid regular expression'); }
                         }
-                        // reset the filtered elements
-                        var logs = document.getElementsByClassName('log');
-                        for (var i=logs.length-1,m; i>=0; i--) {
-                            m = newfilter ? newfilter.test(logs[i].textContent) : 1;
-                            logs[i].className = logs[i].className.replace(/\bfilter\b|$/g,m?'':' filter').trim();
-                            newfilter && newfilter.matchCounts[!!m]++;
-                        }
+                        const logs = rows.getElementsByClassName('log');
+                        for (let i = 0; i < logs.length; i++) applyAllFilters(logs[i]);
                         currfilter = newfilter;
                         updateLogCountDisplay();
-                    }
+                    };
+
                     var filter_pause = 0;
                     filter.oninput = (e) => {
                         if (filter_pause++) return;
@@ -128,17 +320,17 @@
                             wait() {
                                 setTimeout(() => {
                                     if (filter_pause === 1)
-                                        return filter_pause=0,updateFilter(filter.value);
+                                        return filter_pause=0, updateFilter(filter.value);
                                     filter_pause = 1;
                                     this.wait();
-                                },250);
+                                }, 250);
                             }
                         }).wait();
                     };
                     filter.onkeyup = (e) => {
-                        // when enter/escape is pressed - lose focus
                         /^(escape|enter)$/i.test(e.key) && filter.blur();
-                    }
+                    };
+
                     window.addEventListener('keypress', function(e) {
                         if (e.ctrlKey && /[aA]/.test(e.key) && !selectall) {
                             selectall = 1;
@@ -149,58 +341,53 @@
                         selectall = 0;
                         /^escape$/i.test(e.key) && selecttext(null);
                     });
+
                     var connect = () => {
-                        try { 
+                        try {
                             setStatus('Connecting...');
                             var x = new WebSocket('ws://127.0.0.1:!{wssport}/!{logcatid}');
-                            x.onopen = e => { 
-                                setStatus('');getId('clearlcbtn').disabled = false;ws = x;
+                            x.onopen = e => {
+                                setStatus('');
+                                getId('clearlcbtn').disabled = false;
+                                ws = x;
                             };
-                            x.onclose = e => { 
+                            x.onclose = e => {
                                 ws = null;
                                 getId('clearlcbtn').disabled = true;
                             };
-                            x.onerror = e => { setStatus('Connection error')  }
+                            x.onerror = e => { setStatus('Connection error'); };
                             x.onmessage = e => {
                                 if (!rows) return;
                                 var rawlogs = e.data.trim();
                                 if (/^:disconnect$/.test(rawlogs)) {
-                                    x.close(),setStatus('Device disconnected');
+                                    x.close(); setStatus('Device disconnected');
                                     return;
                                 }
                                 if (/^:logcat_cleared$/.test(rawlogs)) {
                                     rows.innerHTML = '';
-                                    rows.insertAdjacentHTML('afterbegin','<div>---- log cleared ----</div>');
                                     logcount = prevlc = 0;
                                     if (currfilter) currfilter.matchCounts = {true:0,false:0};
                                     updateLogCountDisplay();
                                     return;
                                 }
-                                if (last_known_scroll_position > 0) 
-                                    rawlogs = '<div class="hide">'+rawlogs+'</div>';
-                                rows.insertAdjacentHTML('afterbegin',rawlogs);
-                                var logs = rows.firstElementChild.getElementsByClassName('log');
-                                logcount += logs.length;
-                                // keep the DOM bounded - drop the oldest rows to avoid slowdowns
-                                trimLogRows(rows);
-                                // apply the filter to the newly insert elements
-                                if (currfilter) {
-                                    for (var i=logs.length-1,m; i>=0; i--) {
-                                        m = currfilter.test(logs[i].textContent);
-                                        if (!m) logs[i].className += ' filter';
-                                        currfilter.matchCounts[!!m]++;
-                                    }
+                                // rawlogs is a <div class="logblock">...</div> of <div class="log X">...</div>
+                                var block = document.createElement('div');
+                                block.innerHTML = rawlogs;
+                                var logEls = block.getElementsByClassName('log');
+                                var lines = [];
+                                for (var i = 0; i < logEls.length; i++) {
+                                    lines.push(logEls[i].textContent);
                                 }
-                                updateLogCountDisplay();
+                                pendingLines = lines.concat(pendingLines);
+                                if (!paused) flushPending();
                             };
-                        }
-                        catch(e) { setStatus('Connection exception') }
-                    }
+                        } catch(e) { setStatus('Connection exception'); }
+                    };
                     !{connected} && connect();
-                }
+                };
 
                 window.addEventListener("load", function(event) {
-                    try { start(); } catch(e) {setStatus('start exception: '+e.message);}
+                    try { start(); } catch(e) { setStatus('start exception: '+e.message); }
                 });
             })();
     </script>
