@@ -50,7 +50,15 @@ async function createLanguageClient(context, uid, session_id, vscode_props) {
       globSearchRoot = path.normalize(appSourceRoot.replace(/(^[\\/]+)|([\\/]+$)/,''));
       if (globSearchRoot) globSearchRoot += '/';
   }
-  const sourceFiles = (await vscode.workspace.findFiles(`${globSearchRoot}**/*.java`, null, 1000, null)).map(uri => uri.toString());
+  let sourceFiles = [];
+  try {
+      sourceFiles = (await vscode.workspace.findFiles(`${globSearchRoot}**/*.java`, null, 1000, null)).map(uri => uri.toString());
+  } catch (e) {
+      // findFiles can throw when the workspace has no matching root or in untrusted workspaces.
+      // The language server is optional - never let this break extension activation.
+      console.warn('Android DevTools: findFiles failed, continuing without Java sources:', e && e.message);
+      sourceFiles = [];
+  }
 
   // Options to control the language client
   /** @type {import('vscode-languageclient').LanguageClientOptions} */
@@ -133,10 +141,20 @@ function activate(context) {
     }
     analytics.init(undefined, uid, session_id, '', package_json, vscode_props, 'extension-start');
 
-    createLanguageClient(context, uid, session_id, vscode_props).then(client => {
-        languageClient = client;
-        refreshLanguageServerEnabledState();
-    });
+    // Initialize the Java language server in the background. This must NEVER block
+    // or break extension activation - the sidebar views / commands / logcat are the
+    // primary features and must register regardless of language-server state.
+    // (The langserver is legacy Java IntelliSense from the original extension.)
+    setTimeout(() => {
+        createLanguageClient(context, uid, session_id, vscode_props)
+            .then(client => {
+                languageClient = client;
+                refreshLanguageServerEnabledState();
+            })
+            .catch(err => {
+                console.warn('Android DevTools: language server init skipped/failed:', err && err.message);
+            });
+    }, 0);
 
     // The commandId parameter must match the command field in package.json
     const disposables = [
