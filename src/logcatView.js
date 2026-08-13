@@ -9,7 +9,29 @@ const vscode = require('vscode');
 const { LogcatContent } = require('./logcat');
 const { checkADBStarted } = require('./utils/android');
 const { selectTargetDevice } = require('./utils/device');
+const { getAndroidLaunchConfig } = require('./controlView');
 const i18n = require('./i18n');
+
+/**
+ * Resolve the current app's package name for package:mine filtering.
+ * Uses launch.json 'appId' if present, otherwise infers it from a fully
+ * qualified launchActivity (e.g. com.example.app.MainActivity -> com.example.app).
+ * @returns {string}
+ */
+function getAppPackageName() {
+    const cfg = getAndroidLaunchConfig() || {};
+    if (cfg.appId && typeof cfg.appId === 'string' && cfg.appId.trim()) {
+        return cfg.appId.trim();
+    }
+    const act = (cfg.launchActivity || '').trim();
+    if (act && !act.startsWith('.')) {
+        const parts = act.split('.');
+        if (parts.length >= 2) {
+            return parts.slice(0, -1).join('.');
+        }
+    }
+    return '';
+}
 
 /**
  * @type {Map<string, LogcatContent>}
@@ -61,7 +83,9 @@ class LogcatViewProvider {
                 return;
             }
             currentDevice = device.serial;
-            this._logcat = new LogcatContent(device.serial);
+            this._logcat = new LogcatContent(device.serial, {
+                packageName: getAppPackageName(),
+            });
             const html = await this._logcat.content();
             console.log('[android-dev-ext] LogcatViewProvider: logcat html length =', html.length);
             webviewView.webview.html = html;
@@ -83,7 +107,9 @@ class LogcatViewProvider {
                     const device = await selectTargetDevice(vscode, 'Logcat display');
                     if (device && device.serial !== currentDevice) {
                         currentDevice = device.serial;
-                        this._logcat = new LogcatContent(device.serial);
+                        this._logcat = new LogcatContent(device.serial, {
+                            packageName: getAppPackageName(),
+                        });
                         const html = await this._logcat.content();
                         webviewView.webview.html = html;
                     }

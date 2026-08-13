@@ -52,8 +52,9 @@ class LogcatContent {
 
     /**
      * @param {string} deviceid 
+     * @param {{packageName?:string, filterMode?:string}} [options]
      */
-    constructor(deviceid) {
+    constructor(deviceid, options = {}) {
         this._logcatid = deviceid;
         this._logs = [];
         this._htmllogs = [];
@@ -65,6 +66,13 @@ class LogcatContent {
         // Optional logcat filter (from launch.json 'logcatFilter', e.g. '--pid=1234' or '-s MyTag:*').
         // Defaults to empty = no filtering (full device log).
         this._filter = AndroidContentProvider.getLaunchConfigSetting('logcatFilter', '');
+        // package:mine support (like Android Studio's Logcat): only show logs from
+        // the current app's processes. Package name comes from launch.json 'appId'
+        // (or is inferred from launchActivity by the caller). filterMode:
+        //   'all'  = no package filter (whole device)
+        //   'mine' = only the current app (default when a package name is known)
+        this._packageName = String(options.packageName !== undefined ? options.packageName : AndroidContentProvider.getLaunchConfigSetting('appId', '') || '').trim();
+        this._filterMode = options.filterMode || (this._packageName ? 'mine' : 'all');
         this._adbclient = new ADBClient(deviceid);
         this._initwait = this.initialise();
         LogcatInstances.set(this._logcatid, this);
@@ -81,10 +89,11 @@ class LogcatContent {
             // create the WebSocket server instance
             await initWebSocketServer();
             // register handlers for logcat
+            const filter = await this.buildFilterArgs();
             await this._adbclient.startLogcatMonitor({
                 onlog: this.onLogcatContent.bind(this),
                 onclose: this.onLogcatDisconnect.bind(this),
-                filter: this._filter,
+                filter,
             });
             this._state = 'connected';
             this._initwait = null;
@@ -112,10 +121,11 @@ class LogcatContent {
         const prevlogs = {_logs: this._logs, _htmllogs: this._htmllogs, _oldhtmllogs: this._oldhtmllogs };
         this._logs = []; this._htmllogs = []; this._oldhtmllogs = [];
         try {
+            const filter = await this.buildFilterArgs();
             await this._adbclient.startLogcatMonitor({
                 onlog: this.onLogcatContent.bind(this),
                 onclose: this.onLogcatDisconnect.bind(this),
-                filter: this._filter,
+                filter,
             })
             // we successfully reconnected
             this._state = 'connected';
@@ -133,6 +143,77 @@ class LogcatContent {
                 oldlogs: this._oldhtmllogs.join(os.EOL),
             });
             return cached_content;
+        }
+    }
+
+    /**
+     * Retrieve the PIDs belonging to the given package. There may be several (the
+     * main process plus ':webview', ':remote' etc. child processes).
+     * @param {string} pkg
+     * @returns {Promise<string[]>}
+     */
+    async getAppPids(pkg) {
+        try {
+            const out = await new ADBClient(this._logcatid).shell_cmd({ command: `pidof ${pkg}`, untilclosed: true });
+            return String(out).trim().split(/\s+/).filter(x => x && /^\d+$/.test(x));
+        } catch (e) {
+            return [];
+        }
+    }
+
+    /**
+     * Build the effective logcat filter arguments for the current filter mode.
+     * 'mine' => '--pid=<app pids...>' (package:mine, like Android Studio),
+     * merged with any static logcatFilter from launch.json.
+     * @returns {Promise<string>}
+     */
+    async buildFilterArgs() {
+        const static_filter = (this._filter || '').trim();
+        if (this._filterMode !== 'mine' || !this._packageName) {
+            return static_filter;
+        }
+        const pids = await this.getAppPids(this._packageName);
+        if (!pids.length) {
+            return static_filter;
+        }
+        const pid_args = pids.map(p => `--pid=${p}`).join(' ');
+        return (static_filter + ' ' + pid_args).trim();
+    }
+
+    /**
+     * Restart the logcat monitor with the current filter mode. Called when the
+     * user toggles between "all logs" and "package:mine".
+     */
+    async restartMonitor() {
+        try {
+            await this._adbclient.endLogcatMonitor();
+        } catch (e) { /* ignore */ }
+        this._state = 'connecting';
+        const filter = await this.buildFilterArgs();
+        await this._adbclient.startLogcatMonitor({
+            onlog: this.onLogcatContent.bind(this),
+            onclose: this.onLogcatDisconnect.bind(this),
+            filter,
+        });
+        this._state = 'connected';
+        // tell every client the filter changed (frontend can refresh its UI)
+        this.sendClientMessage(':filter_updated');
+    }
+
+    /**
+     * Switch the logcat filter mode ('all' | 'mine') and restart the monitor.
+     * @param {string} mode
+     */
+    async setFilterMode(mode) {
+        if (mode !== 'all' && mode !== 'mine') {
+            return;
+        }
+        this._filterMode = mode;
+        try {
+            await this.restartMonitor();
+        } catch (err) {
+            this._state = 'disconnected';
+            this.sendDisconnectMsg();
         }
     }
 
@@ -170,6 +251,9 @@ class LogcatContent {
                 .catch(e => {
                     D('Clear logcat command failed: ' + e.message);
                 })
+        } else if (message === 'cmd:set_filter:all' || message === 'cmd:set_filter:mine') {
+            // package:mine toggle (Android Studio style)
+            this.setFilterMode(message === 'cmd:set_filter:mine' ? 'mine' : 'all');
         }
     }
 
@@ -202,6 +286,17 @@ class LogcatContent {
             lConnecting: loc('logcat.connecting', 'Connecting...'),
             lConnectionError: loc('logcat.connectionError', 'Connection error'),
             lInvalidRegex: loc('logcat.invalidRegex', 'Invalid regular expression'),
+            lFilterAll: loc('logcat.filterAll', 'All logs'),
+            lFilterMine: loc('logcat.filterMine', 'package:mine'),
+            lFilterModeTitle: loc('logcat.filterModeTitle', 'Show all logs or only the current app'),
+            lFilterMode: this._filterMode,
+            lColTime: loc('logcat.colTime', 'Time'),
+            lColLevel: loc('logcat.colLevel', 'Lvl'),
+            lColPid: loc('logcat.colPid', 'PID'),
+            lColTid: loc('logcat.colTid', 'TID'),
+            lColTag: loc('logcat.colTag', 'Tag'),
+            lColMessage: loc('logcat.colMessage', 'Message'),
+            lWaitingLogs: loc('logcat.waitingLogs', 'Waiting for logs...'),
         }, vars);
         // simple value replacement using !{name} as the placeholder
         const html = this._htmltemplate.replace(/!\{(.*?)\}/g, (match,expr) => ''+(vars[expr.trim()]||''));

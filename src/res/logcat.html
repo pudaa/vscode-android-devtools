@@ -28,7 +28,7 @@
         .vscode-high-contrast .toolbar input[type=text] {color:#fff;border-color:#0cc;background:none;}
 
         /* ── level filter buttons ── */
-        .lvl {padding:.15em .6em;border:1px solid #444;background:none;color:#999;border-radius:3px;cursor:pointer;font-size:.95em;line-height:1.3;}
+        .lvl {padding:.15em .6em;border:1px solid #444;background:none;color:#999;border-radius:4px;cursor:pointer;font-size:.95em;line-height:1.35;transition:background .12s,color .12s,border-color .12s;}
         .lvl:hover:enabled {color:#ccc;}
         .lvl.on {background:#333;color:#fff;}
         .lvl[data-lvl="V"].on {background:#555;color:#fff;}
@@ -44,25 +44,44 @@
         .vscode-high-contrast .lvl:hover:enabled {border-color:darkorange;}
 
         /* ── action buttons (pause/clear/scroll) ── */
-        .act {padding:.15em .5em;border:1px solid #444;background:none;color:#aaa;border-radius:3px;cursor:pointer;font-size:.95em;line-height:1.3;}
+        .act {padding:.15em .5em;border:1px solid #444;background:none;color:#aaa;border-radius:4px;cursor:pointer;font-size:.95em;line-height:1.35;transition:background .12s,color .12s,border-color .12s;}
         .act:hover:enabled {color:#fff;}
         .act.on {background:#444;color:#fff;}
         .act:disabled {opacity:.4;cursor:default;}
+        /* filter mode select (all logs / package:mine) */
+        #filtermode {padding:.15em .5em;border:1px solid #444;background:none;color:#aaa;border-radius:4px;cursor:pointer;font-size:.95em;line-height:1.35;background:var(--vscode-input-background);color:var(--vscode-input-foreground);}
+        #filtermode:focus {outline:none;border-color:#4a4;}
         .vscode-light .act {color:#555;border-color:#bbb;}
         .vscode-light .act:hover:enabled {color:#000;}
         .vscode-light .act.on {background:#ccc;color:#000;}
         .vscode-high-contrast .act {color:#fff;border-color:#0cc;}
         .vscode-high-contrast .act.on {background:#0cc;color:#000;}
 
+        /* ── column header (sticky, aligned with the rows below) ── */
+        .lc {display:flex;align-items:center;position:sticky;top:0;z-index:2;padding:0 .6em;line-height:1.9;font-size:.85em;opacity:.85;background:var(--vscode-sideBar-background);border-bottom:1px solid rgba(128,128,128,.25);user-select:none;}
+        .lc .t {flex:0 0 10.5em;padding-right:.8em;font-variant-numeric:tabular-nums;}
+        .lc .lvl {flex:0 0 1.4em;text-align:center;}
+        .lc .pid {flex:0 0 4.5em;padding-right:.8em;font-variant-numeric:tabular-nums;}
+        .lc .tid {flex:0 0 4.5em;padding-right:.8em;font-variant-numeric:tabular-nums;}
+        .lc .tag {flex:0 0 auto;max-width:12em;overflow:hidden;text-overflow:ellipsis;padding-right:.8em;}
+        .lc .msg {flex:1 1 auto;}
+
         /* ── log rows ── */
-        .log {white-space:nowrap;display:flex;padding:0 .6em;line-height:1.45;}
+        .log {white-space:nowrap;display:flex;padding:0 .6em;line-height:1.5;font-variant-numeric:tabular-nums;}
+        /* Must win over .log's display:flex (same specificity, defined later),
+           otherwise filtered-out rows are counted but still rendered. */
+        .log.filter {display:none;}
         .log:hover {background:rgba(128,128,128,.12);}
-        .log .t {flex:0 0 auto;color:#888;padding-right:.8em;font-variant-numeric:tabular-nums;}
+        .log .t {flex:0 0 10.5em;color:#888;padding-right:.8em;}
         .log .lvl {flex:0 0 1.4em;border:none;padding:0;text-align:center;font-weight:bold;}
-        .log .pid {flex:0 0 auto;color:#6a9;padding-right:.8em;font-variant-numeric:tabular-nums;}
-        .log .tid {flex:0 0 auto;color:#698;padding-right:.8em;font-variant-numeric:tabular-nums;}
-        .log .tag {flex:0 0 auto;color:#c9a;padding-right:.8em;max-width:16em;overflow:hidden;text-overflow:ellipsis;}
-        .log .msg {flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;}
+        .log .pid {flex:0 0 4.5em;color:#6a9;padding-right:.8em;}
+        .log .tid {flex:0 0 4.5em;color:#698;padding-right:.8em;}
+        .log .tag {flex:0 0 auto;color:#c9a;padding-right:.8em;max-width:12em;overflow:hidden;text-overflow:ellipsis;}
+        .log .msg {flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}
+        /* expanded long message: click the message area to expand/collapse */
+        .log.expanded {align-items:flex-start;}
+        .log.expanded .msg {white-space:normal;word-break:break-word;overflow:visible;height:auto;}
+        .log.expanded .tag {white-space:nowrap;}
         .vscode-light .log .t {color:#888;}
         .vscode-light .log .pid {color:#378;}
         .vscode-light .log .tid {color:#389;}
@@ -71,6 +90,9 @@
         .vscode-high-contrast .log .pid {color:#6cf;}
         .vscode-high-contrast .log .tid {color:#5ad;}
         .vscode-high-contrast .log .tag {color:#f9c;}
+
+        /* ── empty state ── */
+        #rows:empty::before {content:'!{lWaitingLogs}';display:block;padding:.8em .6em;opacity:.5;font-size:.95em;}
 
         /* ── status / count ── */
         #lcount {font-family:var(--vscode-font-family);font-size:.9em;margin-top:.3em;color:#6a6;font-variant-numeric:tabular-nums;}
@@ -84,6 +106,10 @@
     <div class="a">
         <div class="b">
             <div class="toolbar">
+                <select id="filtermode" title="!{lFilterModeTitle}">
+                    <option value="all">!{lFilterAll}</option>
+                    <option value="mine">!{lFilterMine}</option>
+                </select>
                 <input id="q" placeholder="!{lFilterPlaceholder}" title="!{lFilterTitle}"/>
                 <button id="pausebtn" class="act" title="!{lPause}">⏸</button>
                 <button id="scrollbtn" class="act on" title="!{lAutoScroll}">⇣</button>
@@ -102,6 +128,14 @@
             </div>
         </div>
         <div id="rc" class="c">
+            <div class="lc">
+                <span class="t">!{lColTime}</span>
+                <span class="lvl">!{lColLevel}</span>
+                <span class="pid">!{lColPid}</span>
+                <span class="tid">!{lColTid}</span>
+                <span class="tag">!{lColTag}</span>
+                <span class="msg">!{lColMessage}</span>
+            </div>
             <div id="status">!{status}</div>
             <div id="rows">!{oldlogs}</div>
         </div>
@@ -193,6 +227,12 @@
                         tg.className = 'tag'; tg.textContent = parsed.tag;
                         const m = document.createElement('span');
                         m.className = 'msg'; m.textContent = parsed.msg;
+                        // hover shows the full message; click the message to expand/collapse
+                        m.title = parsed.msg;
+                        m.addEventListener('click', (ev) => {
+                            ev.stopPropagation();
+                            div.classList.toggle('expanded');
+                        });
                         div.appendChild(t); div.appendChild(l); div.appendChild(p); div.appendChild(ti); div.appendChild(tg); div.appendChild(m);
                         div._text = rawText || [parsed.time, parsed.lvl, parsed.pid, parsed.tid, parsed.tag, parsed.msg].join(' ');
                         return div;
@@ -248,6 +288,12 @@
                     };
 
                     // ── toolbar buttons ──
+                    // package:mine filter mode toggle (Android Studio style)
+                    getId('filtermode').value = '!{lFilterMode}';
+                    getId('filtermode').onchange = () => {
+                        const mode = getId('filtermode').value;
+                        if (ws) ws.send('cmd:set_filter:' + mode);
+                    };
                     getId('clearlcbtn').onclick = (e) => {
                         ws && ws.send('cmd:clear_logcat');
                     };
@@ -368,6 +414,10 @@
                                     logcount = prevlc = 0;
                                     if (currfilter) currfilter.matchCounts = {true:0,false:0};
                                     updateLogCountDisplay();
+                                    return;
+                                }
+                                if (/^:filter_updated$/.test(rawlogs)) {
+                                    // the backend restarted the logcat with a new filter mode
                                     return;
                                 }
                                 // rawlogs is a <div class="logblock">...</div> of <div class="log X">...</div>

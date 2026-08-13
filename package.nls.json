@@ -49,5 +49,15 @@
     "logcat.connecting": "Connecting...",
     "logcat.connectionError": "Connection error",
     "logcat.invalidRegex": "Invalid regular expression",
-    "logcat.adbStartFailed": "ADB server could not be started. Set ANDROID_HOME or add adb to PATH."
+    "logcat.adbStartFailed": "ADB server could not be started. Set ANDROID_HOME or add adb to PATH.",
+    "logcat.filterAll": "All logs",
+    "logcat.filterMine": "package:mine",
+    "logcat.filterModeTitle": "Show all logs or only the current app",
+    "logcat.colTime": "Time",
+    "logcat.colLevel": "Lvl",
+    "logcat.colPid": "PID",
+    "logcat.colTid": "TID",
+    "logcat.colTag": "Tag",
+    "logcat.colMessage": "Message",
+    "logcat.waitingLogs": "Waiting for logs..."
 }

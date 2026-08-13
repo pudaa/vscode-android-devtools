@@ -49,5 +49,15 @@
     "logcat.connecting": "连接中...",
     "logcat.connectionError": "连接错误",
     "logcat.invalidRegex": "无效的正则表达式",
-    "logcat.adbStartFailed": "无法启动 ADB 服务，请设置 ANDROID_HOME 或将 adb 添加到 PATH。"
+    "logcat.adbStartFailed": "无法启动 ADB 服务，请设置 ANDROID_HOME 或将 adb 添加到 PATH。",
+    "logcat.filterAll": "全部日志",
+    "logcat.filterMine": "package:mine",
+    "logcat.filterModeTitle": "显示全部日志或仅当前应用",
+    "logcat.colTime": "时间",
+    "logcat.colLevel": "级别",
+    "logcat.colPid": "PID",
+    "logcat.colTid": "TID",
+    "logcat.colTag": "标签",
+    "logcat.colMessage": "消息",
+    "logcat.waitingLogs": "等待日志..."
 }
