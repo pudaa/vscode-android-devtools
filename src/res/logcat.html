@@ -66,9 +66,10 @@
         /* ── column widths: shared by header and rows via CSS variables so
            they ALWAYS align (dragging a handle updates the variable) ──
            --col-lvl is 2em so the header label ("Lvl"/"级别") fits fully;
-           every header cell clips its text so wide labels can never push
-           the neighbouring columns out of alignment. */
-        #rc {--col-t:10.5em; --col-lvl:2em; --col-pid:4.5em; --col-tid:4.5em; --col-tag:auto;}
+           --col-tag is a FIXED width (not auto) so every row's tag column has
+           the same boundary - long tags are ellipsized instead of stretching
+           each row to a different width. */
+        #rc {--col-t:10.5em; --col-lvl:2em; --col-pid:4.5em; --col-tid:4.5em; --col-tag:12em; --col-tag-max:12em;}
         /* ── column header (sticky, aligned with the rows below) ── */
         .lc {display:flex;align-items:center;position:sticky;top:0;z-index:2;padding:0 .6em;line-height:1.9;opacity:.9;background:var(--vscode-sideBar-background);border-bottom:1px solid rgba(128,128,128,.25);user-select:none;}
         .lc .t {flex:0 0 var(--col-t);padding-right:.8em;font-variant-numeric:tabular-nums;text-align:center;position:relative;overflow:hidden;white-space:nowrap;}
@@ -294,20 +295,31 @@
                         const tg = document.createElement('span');
                         tg.className = 'tag'; tg.textContent = parsed.tag;
                         // Android Studio style: double-click a tag to filter by it
-                        tg.title = parsed.tag + ' (double-click to filter)';
+                        tg.title = parsed.tag + ' (double-click to filter, right-click to copy)';
                         tg.addEventListener('dblclick', (ev) => {
                             ev.stopPropagation();
                             const inp = getId('q');
                             inp.value = 'tag:' + parsed.tag;
                             updateFilter(inp.value);
                         });
+                        tg.addEventListener('contextmenu', (ev) => {
+                            ev.stopPropagation();
+                            ev.preventDefault();
+                            copyText(parsed.tag, parsed);
+                        });
                         const m = document.createElement('span');
                         m.className = 'msg'; m.textContent = parsed.msg;
-                        // hover shows the full message; click the message to expand/collapse
+                        // hover shows the full message; click the message to expand/collapse;
+                        // right-click copies the full message
                         m.title = parsed.msg;
                         m.addEventListener('click', (ev) => {
                             ev.stopPropagation();
                             div.classList.toggle('expanded');
+                        });
+                        m.addEventListener('contextmenu', (ev) => {
+                            ev.stopPropagation();
+                            ev.preventDefault();
+                            copyText(parsed.msg, parsed);
                         });
                         div.appendChild(t); div.appendChild(l); div.appendChild(p); div.appendChild(ti); div.appendChild(tg); div.appendChild(m);
                         div._text = rawText || [parsed.time, parsed.lvl, parsed.pid, parsed.tid, parsed.tag, parsed.msg].join(' ');
@@ -350,7 +362,34 @@
                         return visible;
                     };
 
-                    // render pending lines (called on data, or when unpaused)
+                    // ── clipboard helper (right-click copy) ──
+                    const copyText = (text, parsed) => {
+                        const payload = parsed ? (parsed.time + ' ' + parsed.pid + ' ' + parsed.tid + ' ' + parsed.lvl + ' ' + parsed.tag + ' ' + parsed.msg) : text;
+                        const done = () => setStatus('Copied: ' + String(text).slice(0, 40) + (text.length > 40 ? '…' : ''));
+                        try {
+                            if (navigator.clipboard && navigator.clipboard.writeText) {
+                                navigator.clipboard.writeText(payload).then(done).catch(() => fallbackCopy(payload, done));
+                            } else {
+                                fallbackCopy(payload, done);
+                            }
+                        } catch (e) {
+                            fallbackCopy(payload, done);
+                        }
+                    };
+                    const fallbackCopy = (text, done) => {
+                        try {
+                            const ta = document.createElement('textarea');
+                            ta.value = text;
+                            ta.style.position = 'fixed'; ta.style.opacity = '0';
+                            document.body.appendChild(ta);
+                            ta.select();
+                            document.execCommand('copy');
+                            document.body.removeChild(ta);
+                            done && done();
+                        } catch (e) { /* ignore */ }
+                    };
+
+                    // ── render pending lines (called on data, or when unpaused) ──
                     const flushPending = () => {
                         if (paused) return;
                         if (!pendingLines.length) return;
@@ -437,7 +476,9 @@
                             if (!cb.checked && i < 0) hiddenCols.push(col);
                             if (cb.checked && i >= 0) hiddenCols.splice(i, 1);
                             localStorage.setItem('lcHiddenCols', JSON.stringify(hiddenCols));
-                    applyHiddenCols();
+                            applyHiddenCols();
+                        };
+                    });
                     // ── column resize handles ──
                     // drag a handle in the header to resize the column; the
                     // width is stored in a CSS variable shared by header+rows
@@ -452,7 +493,8 @@
                             }
                         });
                     };
-                    applySavedWidths();                    document.querySelectorAll('.lc .chandle').forEach(h => {
+                    applySavedWidths();
+                    document.querySelectorAll('.lc .chandle').forEach(h => {
                         const col = h.dataset.col;
                         h.addEventListener('mousedown', (ev) => {
                             ev.preventDefault();
@@ -492,8 +534,6 @@
                             if (col === 'tag') getId('rc').style.removeProperty('--col-tag-max');
                         });
                     });
-                        };
-                    });
                     getId('colbtn').onclick = () => {
                         getId('colmenu').classList.toggle('show');
                     };
@@ -532,8 +572,15 @@
                         };
                     });
 
-                    getId('rc').onscroll = (e) => {
-                        last_known_scroll_position = e.target.scrollTop;
+                    // right-click anywhere else on a log row copies the whole line
+                    rows.addEventListener('contextmenu', (e) => {
+                        const row = e.target && e.target.closest ? e.target.closest('.log') : null;
+                        if (!row) return;
+                        e.preventDefault();
+                        copyText(row._text || '', null);
+                    });
+
+                    getId('rc').onscroll = (e) => {                        last_known_scroll_position = e.target.scrollTop;
                         var near_end = newestFirst
                             ? last_known_scroll_position === 0
                             : (e.target.scrollHeight - e.target.scrollTop - e.target.clientHeight) < 40;
