@@ -215,7 +215,7 @@ class LogcatContent {
      *   - app exited             -> drop the pid filter (show everything again)
      * This makes the view robust to app restarts (and to the view being opened
      * before the app has started) instead of silently freezing on an empty log.
-     * @param {boolean} need true = app not running, keep polling
+     * @param {boolean} need true = keep polling
      */
     schedulePidRetry(need) {
         if (this._pidRetryTimer) {
@@ -230,18 +230,19 @@ class LogcatContent {
             const current_pids = (this._activePids || []).join(',');
             const new_pids = pids.join(',');
             try {
-                if (pids.length && new_pids !== current_pids) {
-                    // app came up (or restarted): switch to package:mine filtering
+                if (new_pids !== current_pids) {
+                    // app came up / restarted / exited - restart the monitor so
+                    // the filter follows the actual process set. restartMonitor
+                    // refreshes _activePids via buildFilterArgs and reschedules
+                    // this poll itself.
                     await this.restartMonitor();
-                } else if (!pids.length && current_pids) {
-                    // app exited: drop the pid filter so the log stays visible
-                    this._activePids = [];
-                    await this.restartMonitor();
-                } else if (!pids.length && !current_pids) {
-                    // still not running - keep polling
-                    this.schedulePidRetry(true);
                 }
-            } catch (e) {
+            } catch (e) { /* keep polling */ }
+            // ALWAYS keep the poll alive while in package:mine mode - a stable
+            // pid set still needs watching so app restarts are picked up (the
+            // old logic stopped polling once the pids matched, so a process
+            // restart left the monitor filtering on the dead --pid forever).
+            if (this._filterMode === 'mine' && this._packageName && !this._pidRetryTimer) {
                 this.schedulePidRetry(true);
             }
         }, 2000);
