@@ -49,8 +49,14 @@
         .act.on {background:#444;color:#fff;}
         .act:disabled {opacity:.4;cursor:default;}
         /* filter mode + process selects (all logs / package:mine / process) */
-        #filtermode, #procselect {padding:.15em .5em;border:1px solid #444;background:none;color:#aaa;border-radius:4px;cursor:pointer;font-size:.95em;line-height:1.35;background:var(--vscode-input-background);color:var(--vscode-input-foreground);}
-        #filtermode:focus, #procselect:focus {outline:none;border-color:#4a4;}
+        #procselect {padding:.15em .5em;border:1px solid #444;background:none;color:#aaa;border-radius:4px;cursor:pointer;font-size:.95em;line-height:1.35;background:var(--vscode-input-background);color:var(--vscode-input-foreground);}
+        #procselect:focus {outline:none;border-color:#4a4;}
+        /* column visibility popup */
+        .b {position:relative;}
+        .colmenu {display:none;position:absolute;top:100%;right:.6em;background:var(--vscode-menu-background);border:1px solid var(--vscode-menu-border,#444);border-radius:4px;padding:.4em .6em;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,.3);}
+        .colmenu.show {display:block;}
+        .colmenu label {display:block;padding:.15em .2em;cursor:pointer;white-space:nowrap;color:var(--vscode-menu-foreground);}
+        #rc.hide-t .t, #rc.hide-lvl .lvl, #rc.hide-pid .pid, #rc.hide-tid .tid, #rc.hide-tag .tag, #rc.hide-msg .msg {display:none;}
         .vscode-light .act {color:#555;border-color:#bbb;}
         .vscode-light .act:hover:enabled {color:#000;}
         .vscode-light .act.on {background:#ccc;color:#000;}
@@ -106,10 +112,6 @@
     <div class="a">
         <div class="b">
             <div class="toolbar">
-                <select id="filtermode" title="!{lFilterModeTitle}">
-                    <option value="all">!{lFilterAll}</option>
-                    <option value="mine">!{lFilterMine}</option>
-                </select>
                 <select id="procselect" title="!{lProcessTitle}">
                     <option value="mine">!{lFilterMine}</option>
                     <option value="all">!{lFilterAll}</option>
@@ -119,6 +121,15 @@
                 <button id="scrollbtn" class="act on" title="!{lAutoScroll}">⇣</button>
                 <button id="clearlcbtn" class="act" disabled="true" title="!{lClear}">🗑</button>
                 <button id="exportbtn" class="act" disabled="true" title="!{lExport}">⤓</button>
+                <button id="colbtn" class="act" title="!{lColumns}">▤</button>
+                <div id="colmenu" class="colmenu">
+                    <label><input type="checkbox" data-col="t" checked/> !{lColTime}</label>
+                    <label><input type="checkbox" data-col="lvl" checked/> !{lColLevel}</label>
+                    <label><input type="checkbox" data-col="pid" checked/> !{lColPid}</label>
+                    <label><input type="checkbox" data-col="tid" checked/> !{lColTid}</label>
+                    <label><input type="checkbox" data-col="tag" checked/> !{lColTag}</label>
+                    <label><input type="checkbox" data-col="msg" checked/> !{lColMessage}</label>
+                </div>
             </div>
             <div class="toolbar" style="margin-top:.35em;">
                 <span style="opacity:.7;font-size:.9em;">!{lLevel}</span>
@@ -319,25 +330,46 @@
                     };
 
                     // ── toolbar buttons ──
-                    // package:mine filter mode toggle (Android Studio style)
-                    getId('filtermode').value = '!{lFilterMode}';
-                    getId('filtermode').onchange = () => {
-                        const mode = getId('filtermode').value;
-                        getId('procselect').value = mode;
-                        if (ws) ws.send('cmd:set_filter:' + mode);
-                    };
-                    // process selector: package:mine / all logs / a specific debug process
+                    // process/filter selector: package:mine / all logs / a specific debug process
                     getId('procselect').value = '!{lFilterMode}';
                     getId('procselect').onchange = () => {
                         const v = getId('procselect').value;
                         if (!ws) return;
                         if (v === 'mine' || v === 'all') {
-                            getId('filtermode').value = v;
                             ws.send('cmd:set_filter:' + v);
                         } else if (v.indexOf('proc:') === 0) {
                             ws.send('cmd:set_process:' + v.slice(5));
                         }
                     };
+                    // column visibility (hide time/level/pid/tid/tag/message as needed)
+                    const hiddenCols = JSON.parse(localStorage.getItem('lcHiddenCols') || '[]');
+                    const applyHiddenCols = () => {
+                        const root = getId('rc');
+                        ['t','lvl','pid','tid','tag','msg'].forEach(c => {
+                            root.classList.toggle('hide-' + c, hiddenCols.indexOf(c) >= 0);
+                        });
+                    };
+                    document.querySelectorAll('#colmenu input[data-col]').forEach(cb => {
+                        const col = cb.dataset.col;
+                        cb.checked = hiddenCols.indexOf(col) < 0;
+                        cb.onchange = () => {
+                            const i = hiddenCols.indexOf(col);
+                            if (!cb.checked && i < 0) hiddenCols.push(col);
+                            if (cb.checked && i >= 0) hiddenCols.splice(i, 1);
+                            localStorage.setItem('lcHiddenCols', JSON.stringify(hiddenCols));
+                            applyHiddenCols();
+                        };
+                    });
+                    getId('colbtn').onclick = () => {
+                        getId('colmenu').classList.toggle('show');
+                    };
+                    document.addEventListener('click', (e) => {
+                        const m = getId('colmenu');
+                        if (m.classList.contains('show') && !m.contains(e.target) && e.target.id !== 'colbtn') {
+                            m.classList.remove('show');
+                        }
+                    });
+                    applyHiddenCols();
                     getId('clearlcbtn').onclick = (e) => {
                         ws && ws.send('cmd:clear_logcat');
                     };

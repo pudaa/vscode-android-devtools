@@ -369,7 +369,8 @@ class LogcatContent {
             lColMessage: loc('logcat.colMessage', 'Message'),
             lWaitingLogs: loc('logcat.waitingLogs', 'Waiting for logs...'),
             lExport: loc('logcat.export', 'Export logcat'),
-            lProcessTitle: loc('logcat.processTitle', 'Filter by process'),
+            lProcessTitle: loc('logcat.processTitle', 'Filter logs'),
+            lColumns: loc('logcat.columns', 'Columns'),
         }, vars);
         // simple value replacement using !{name} as the placeholder
         const html = this._htmltemplate.replace(/!\{(.*?)\}/g, (match,expr) => ''+(vars[expr.trim()]||''));

@@ -10,15 +10,17 @@ const { LogcatContent } = require('./logcat');
 const { checkADBStarted } = require('./utils/android');
 const { selectTargetDevice } = require('./utils/device');
 const { getAndroidLaunchConfig } = require('./controlView');
+const { APKFileInfo } = require('./apk-file-info');
 const i18n = require('./i18n');
 
 /**
- * Resolve the current app's package name for package:mine filtering.
- * Uses launch.json 'appId' if present, otherwise infers it from a fully
- * qualified launchActivity (e.g. com.example.app.MainActivity -> com.example.app).
- * @returns {string}
+ * Resolve the current app's package name for package:mine filtering, in order:
+ *   1. launch.json 'appId'
+ *   2. fully qualified launchActivity (com.example.app.MainActivity -> com.example.app)
+ *   3. the real package name parsed from the built APK manifest (reliable fallback)
+ * @returns {Promise<string>}
  */
-function getAppPackageName() {
+async function getAppPackageName() {
     const cfg = getAndroidLaunchConfig() || {};
     if (cfg.appId && typeof cfg.appId === 'string' && cfg.appId.trim()) {
         return cfg.appId.trim();
@@ -29,6 +31,19 @@ function getAppPackageName() {
         if (parts.length >= 2) {
             return parts.slice(0, -1).join('.');
         }
+    }
+    if (cfg.apkFile) {
+        try {
+            const folders = vscode.workspace.workspaceFolders;
+            const root = folders && folders[0] ? folders[0].uri.fsPath : '';
+            const apk = String(cfg.apkFile)
+                .replace(/\$\{workspaceRoot\}/g, root)
+                .replace(/\$\{workspaceFolder\}/g, root);
+            const info = await APKFileInfo.from({ apkFile: apk });
+            if (info.manifest && info.manifest.package) {
+                return info.manifest.package;
+            }
+        } catch (e) { /* APK missing/unreadable - package:mine falls back to all logs */ }
     }
     return '';
 }
@@ -84,7 +99,7 @@ class LogcatViewProvider {
             }
             currentDevice = device.serial;
             this._logcat = new LogcatContent(device.serial, {
-                packageName: getAppPackageName(),
+                packageName: await getAppPackageName(),
             });
             const html = await this._logcat.content();
             console.log('[android-dev-ext] LogcatViewProvider: logcat html length =', html.length);
@@ -108,7 +123,7 @@ class LogcatViewProvider {
                     if (device && device.serial !== currentDevice) {
                         currentDevice = device.serial;
                         this._logcat = new LogcatContent(device.serial, {
-                            packageName: getAppPackageName(),
+                            packageName: await getAppPackageName(),
                         });
                         const html = await this._logcat.content();
                         webviewView.webview.html = html;

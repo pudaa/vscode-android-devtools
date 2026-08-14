@@ -62,5 +62,6 @@
     "logcat.waitingLogs": "Waiting for logs...",
     "logcat.export": "Export logcat",
     "logcat.exported": "Logcat exported to {0}",
-    "logcat.processTitle": "Filter by process"
+    "logcat.processTitle": "Filter logs",
+    "logcat.columns": "Columns"
 }
