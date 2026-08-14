@@ -213,7 +213,8 @@ class Debugger extends EventEmitter {
             // failures:
             //  Error: Activity not started...
             // /system/bin/sh: syntax error: unexpected EOF - this happens with invalid am command arguments
-            const m = stdout.match(/Error:.*|syntax error:/gi);
+            //  Security exception: Permission Denial: ... (activity not exported)
+            const m = stdout.match(/Error:.*|syntax error:|Security exception:.*|Permission Denial/gi);
             if (!m) {
                 // return the stdout from am (it shows the fully qualified component name)
                 return stdout.toString().trim();
