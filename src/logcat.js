@@ -468,7 +468,14 @@ class LogcatContent {
             lColumns: loc('logcat.columns', 'Columns'),
         }, vars);
         // simple value replacement using !{name} as the placeholder
-        const html = this._htmltemplate.replace(/!\{(.*?)\}/g, (match,expr) => ''+(vars[expr.trim()]||''));
+        // (use ?? '' instead of || '' so false/0 values are preserved - a
+        // false boolean rendered as '' would break the inline JS, e.g.
+        // "var newestFirst =  === true" is a syntax error and kills the whole
+        // webview script)
+        const html = this._htmltemplate.replace(/!\{(.*?)\}/g, (match,expr) => {
+            const v = vars[expr.trim()];
+            return (v === undefined || v === null) ? '' : '' + v;
+        });
         return html;
     }
     renotify() {
