@@ -152,8 +152,12 @@ class Debugger extends EventEmitter {
             throw new Error('startDebugSession: session already active');
         }
         this.session = new DebugSession(build, deviceid);
+        // Logcat-only mode: strip '-D' (wait-for-debugger) so the app starts
+        // normally instead of hanging on "waiting for debugger" with no debugger
+        // ever attaching. The default startCommandArgs always includes '-D'.
+        const args = (build.startCommandArgs || []).filter(a => String(a).trim() !== '-D');
         // run 'am start' only - do not scan for JDWP processes or connect
-        return Debugger.runApp(deviceid, build.startCommandArgs, build.postLaunchPause);
+        return Debugger.runApp(deviceid, args, build.postLaunchPause);
     }
 
     /**

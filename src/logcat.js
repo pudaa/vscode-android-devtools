@@ -174,7 +174,10 @@ class LogcatContent {
         let pid_args = '';
         if (this._filterMode === 'mine' && this._packageName) {
             const pids = await this.getAppPids(this._packageName);
-            pid_args = pids.map(p => `--pid=${p}`).join(' ');
+            // If the app isn't running there are no PIDs: keep filtering with a
+            // bogus pid so we show nothing instead of falling back to the whole
+            // device (matches Android Studio's package:mine behaviour).
+            pid_args = pids.length ? pids.map(p => `--pid=${p}`).join(' ') : '--pid=0';
         } else if (this._filterMode === 'process' && this._processPid) {
             pid_args = `--pid=${this._processPid}`;
         }
