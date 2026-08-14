@@ -70,6 +70,11 @@
            the same boundary - long tags are ellipsized instead of stretching
            each row to a different width. */
         #rc {--col-t:10.5em; --col-lvl:2em; --col-pid:4.5em; --col-tid:4.5em; --col-tag:12em; --col-tag-max:12em;}
+        /* ── level filter group: one atomic flex item so it wraps as a whole.
+           Wide (bottom panel): sits inline with the other filters.
+           Narrow (sidebar): wraps onto its own second line. */
+        .lvlbar {display:inline-flex;align-items:center;gap:.4em;flex-wrap:nowrap;white-space:nowrap;margin-top:.15em;margin-bottom:.15em;}
+
         /* ── column header (sticky, aligned with the rows below) ── */
         .lc {display:flex;align-items:center;position:sticky;top:0;z-index:2;padding:0 .6em;line-height:1.9;opacity:.9;background:var(--vscode-sideBar-background);border-bottom:1px solid rgba(128,128,128,.25);user-select:none;}
         .lc .t {flex:0 0 var(--col-t);padding-right:.8em;font-variant-numeric:tabular-nums;text-align:center;position:relative;overflow:hidden;white-space:nowrap;}
@@ -149,17 +154,20 @@
                     <label><input type="checkbox" data-col="tag" checked/> !{lColTag}</label>
                     <label><input type="checkbox" data-col="msg" checked/> !{lColMessage}</label>
                 </div>
-            </div>
-            <div class="toolbar" style="margin-top:.35em;">
-                <span style="opacity:.7;font-size:.9em;">!{lLevel}</span>
-                <button class="lvl on" data-lvl="V">V</button>
-                <button class="lvl on" data-lvl="D">D</button>
-                <button class="lvl on" data-lvl="I">I</button>
-                <button class="lvl on" data-lvl="W">W</button>
-                <button class="lvl on" data-lvl="E">E</button>
-                <button class="lvl on" data-lvl="F">F</button>
                 <span class="sep"></span>
-                <span id="lcount"></span>
+                <!-- level filter + count: one flex item, so in the WIDE bottom
+                     panel it sits on the same row as the other filters, while
+                     in the NARROW sidebar it wraps onto a second line -->
+                <span class="lvlbar">
+                    <span style="opacity:.7;font-size:.9em;">!{lLevel}</span>
+                    <button class="lvl on" data-lvl="V">V</button>
+                    <button class="lvl on" data-lvl="D">D</button>
+                    <button class="lvl on" data-lvl="I">I</button>
+                    <button class="lvl on" data-lvl="W">W</button>
+                    <button class="lvl on" data-lvl="E">E</button>
+                    <button class="lvl on" data-lvl="F">F</button>
+                    <span id="lcount"></span>
+                </span>
             </div>
         </div>
         <div id="rc" class="c">
