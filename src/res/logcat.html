@@ -114,6 +114,7 @@
                 <button id="pausebtn" class="act" title="!{lPause}">⏸</button>
                 <button id="scrollbtn" class="act on" title="!{lAutoScroll}">⇣</button>
                 <button id="clearlcbtn" class="act" disabled="true" title="!{lClear}">🗑</button>
+                <button id="exportbtn" class="act" disabled="true" title="!{lExport}">⤓</button>
             </div>
             <div class="toolbar" style="margin-top:.35em;">
                 <span style="opacity:.7;font-size:.9em;">!{lLevel}</span>
@@ -323,6 +324,9 @@
                     getId('clearlcbtn').onclick = (e) => {
                         ws && ws.send('cmd:clear_logcat');
                     };
+                    getId('exportbtn').onclick = (e) => {
+                        ws && ws.send('cmd:export_logcat');
+                    };
                     getId('pausebtn').onclick = (e) => {
                         paused = !paused;
                         getId('pausebtn').classList.toggle('on', paused);
@@ -419,11 +423,13 @@
                             x.onopen = e => {
                                 setStatus('');
                                 getId('clearlcbtn').disabled = false;
+                                getId('exportbtn').disabled = false;
                                 ws = x;
                             };
                             x.onclose = e => {
                                 ws = null;
                                 getId('clearlcbtn').disabled = true;
+                                getId('exportbtn').disabled = true;
                             };
                             x.onerror = e => { setStatus('!{lConnectionError}'); };
                             x.onmessage = e => {

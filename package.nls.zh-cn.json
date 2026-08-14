@@ -59,5 +59,7 @@
     "logcat.colTid": "TID",
     "logcat.colTag": "标签",
     "logcat.colMessage": "消息",
-    "logcat.waitingLogs": "等待日志..."
+    "logcat.waitingLogs": "等待日志...",
+    "logcat.export": "导出日志",
+    "logcat.exported": "日志已导出到 {0}"
 }

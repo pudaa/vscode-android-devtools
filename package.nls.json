@@ -59,5 +59,7 @@
     "logcat.colTid": "TID",
     "logcat.colTag": "Tag",
     "logcat.colMessage": "Message",
-    "logcat.waitingLogs": "Waiting for logs..."
+    "logcat.waitingLogs": "Waiting for logs...",
+    "logcat.export": "Export logcat",
+    "logcat.exported": "Logcat exported to {0}"
 }

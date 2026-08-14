@@ -254,6 +254,39 @@ class LogcatContent {
         } else if (message === 'cmd:set_filter:all' || message === 'cmd:set_filter:mine') {
             // package:mine toggle (Android Studio style)
             this.setFilterMode(message === 'cmd:set_filter:mine' ? 'mine' : 'all');
+        } else if (message === 'cmd:export_logcat') {
+            this.exportLogcat();
+        }
+    }
+
+    /**
+     * Export the buffered logcat lines to a file via a VS Code save dialog.
+     * No-op when not running inside the extension host (e.g. debug adapter).
+     */
+    async exportLogcat() {
+        let vscode;
+        try {
+            vscode = require('vscode');
+        } catch (e) {
+            return; // not inside the extension host
+        }
+        try {
+            // _oldhtmllogs holds the most recent lines (newest-first) as HTML
+            // fragments; strip the tags and un-escape to get plain text lines.
+            const texts = this._oldhtmllogs
+                .map(h => String(h).replace(/<[^>]*>/g, ''))
+                .map(s => s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'"))
+                .reverse(); // oldest first, matching log order
+            const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const uri = await vscode.window.showSaveDialog({
+                defaultUri: vscode.Uri.file(`logcat-${this._logcatid}-${stamp}.txt`),
+                filters: { 'Logcat': ['txt', 'log'] },
+            });
+            if (!uri) return;
+            await vscode.workspace.fs.writeFile(uri, Buffer.from(texts.join('\n') + '\n', 'utf8'));
+            vscode.window.showInformationMessage(loc('logcat.exported', 'Logcat exported to {0}', uri.fsPath));
+        } catch (e) {
+            D('Export logcat failed: ' + (e && e.message));
         }
     }
 
@@ -297,6 +330,7 @@ class LogcatContent {
             lColTag: loc('logcat.colTag', 'Tag'),
             lColMessage: loc('logcat.colMessage', 'Message'),
             lWaitingLogs: loc('logcat.waitingLogs', 'Waiting for logs...'),
+            lExport: loc('logcat.export', 'Export logcat'),
         }, vars);
         // simple value replacement using !{name} as the placeholder
         const html = this._htmltemplate.replace(/!\{(.*?)\}/g, (match,expr) => ''+(vars[expr.trim()]||''));
