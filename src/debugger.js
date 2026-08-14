@@ -91,13 +91,26 @@ class Debugger extends EventEmitter {
         const fallback_args = this.getLauncherFallbackArgs(build);
         const stdout = await Debugger.runApp(deviceid, build.startCommandArgs, build.postLaunchPause, fallback_args);
 
-        // 轮询等待目标进程出现（刚覆盖安装后的冷启动可能较慢），
-        // 避免"应用启动了但调试器没 attach 上"导致的退出/不进入
-        const pid = await Debugger.waitForDebugProcess(build, deviceid, 30e3);
+        try {
+            // 轮询等待目标进程出现（刚覆盖安装后的冷启动可能较慢），
+            // 避免"应用启动了但调试器没 attach 上"导致的退出/不进入
+            const pid = await Debugger.waitForDebugProcess(build, deviceid, 30e3);
 
-        // after connect(), the caller must call resume() to begin
-        await this.connect(pid);
-        return stdout;
+            // after connect(), the caller must call resume() to begin
+            await this.connect(pid);
+            return stdout;
+        } catch (err) {
+            // The app was launched with '-D' (waiting for a debugger). If the
+            // attach failed for any reason, restart it WITHOUT '-D' so it is
+            // usable again instead of hanging on "waiting for debugger" forever.
+            try {
+                await new ADBClient(deviceid).shell_cmd({ command: `am force-stop ${build.pkgname}` });
+                const stripD = arr => (arr || []).filter(a => String(a).trim() !== '-D');
+                const fb = this.getLauncherFallbackArgs(build);
+                await Debugger.runApp(deviceid, stripD(build.startCommandArgs), build.postLaunchPause, fb ? stripD(fb) : null);
+            } catch (e2) { /* best effort */ }
+            throw new Error(`Could not attach the debugger to ${build.pkgname}: ${err.message} (the app was restarted without debugging so it stays usable)`);
+        }
     }
 
     /**
