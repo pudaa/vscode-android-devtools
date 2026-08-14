@@ -158,6 +158,11 @@ class AndroidSocket extends EventEmitter {
             if (this.socket_ended) {
                 return reject(new Error(`${this.which} socket read failed. Socket closed.`));
             }
+            // data may already be buffered (a 'data-changed' event fired while
+            // no reader was waiting and got dropped) - don't block on that
+            if (this.readbuffer.byteLength > 0) {
+                return resolve();
+            }
             let done = 0, timer = null;
             let onDataChanged = () => {
                 if ((done += 1) !== 1) return;

@@ -344,8 +344,10 @@
                         pendingLines.length = 0;
                         trimLogRows(rows);
                         updateLogCountDisplay();
+                        // #rc is the scroll container (overflow:auto), not #rows
                         if (autoScroll) {
-                            rows.scrollTop = newestFirst ? 0 : rows.scrollHeight;
+                            const rc = getId('rc');
+                            rc.scrollTop = newestFirst ? 0 : rc.scrollHeight;
                         }
                     };
 
