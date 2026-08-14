@@ -15,7 +15,7 @@
     "control.logcatManual": "manual",
     "control.apk": "APK",
     "control.activity": "Launch",
-    "control.btnLaunchLogcat": "▶ Launch + Logcat",
+    "control.btnLaunchLogcat": "Launch + Logcat",
     "control.btnLaunchDebug": "Debug Launch",
     "control.btnViewLogcat": "View Logcat",
     "control.btnEditLaunchJson": "Edit launch.json",

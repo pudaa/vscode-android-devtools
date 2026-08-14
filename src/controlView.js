@@ -126,6 +126,7 @@ body { font-family: var(--vscode-font-family); font-size: var(--vscode-font-size
 .btn:hover { background: var(--vscode-button-hoverBackground); }
 .btn.secondary { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
 .btn.secondary:hover { background: var(--vscode-button-secondaryHoverBackground); }
+.btn svg.bic { width: 14px; height: 14px; fill: currentColor; vertical-align: -2px; margin-right: .35em; }
 .badge { display:inline-block; padding: 1px 8px; border-radius: 10px; font-size: .85em; }
 .badge.on { background: var(--vscode-inputValidation-infoBackground, #125); color: var(--vscode-inputValidation-infoForeground, #6cf); }
 .badge.off { background: var(--vscode-inputValidation-warningBackground, #531); color: var(--vscode-inputValidation-warningForeground, #fc0); }
@@ -138,7 +139,7 @@ body { font-family: var(--vscode-font-family); font-size: var(--vscode-font-size
   <div class="row"><span class="label">${i18n.localize('control.activity', 'Launch')}</span><span class="value">${escapeHtml(activity || i18n.localize('control.launcherActivity', 'launcher activity'))}</span></div>
 </div>
 
-<button class="btn" id="btnLogcat" data-cmd="launch-logcat">${i18n.localize('control.btnLaunchLogcat', '▶ Launch + Logcat')}</button>
+<button class="btn" id="btnLogcat" data-cmd="launch-logcat"><svg class="bic" viewBox="0 0 1024 1024" aria-hidden="true"><path d="M882.734114 459.147258l0.024559-0.024559L244.016061 21.12718l-0.199545 0.188288C230.582097 8.748245 212.62819 1.014096 192.840518 1.014096c-40.704051 0-73.699536 32.66905-73.699536 72.996524 0 22.148439-0.954745 65.513086 0 64.572668l0 373.422851 0 393.071354c0 0.325411 0 25.249057 0 44.935422 0 40.302915 32.995485 72.972988 73.699536 72.972988 19.862373 0 37.892005-7.78429 51.125401-20.466124l0.050142 0.025583 638.742613-437.982216-0.024559-0.038886c13.886265-13.270235 22.549575-31.889291 22.549575-52.531424 0-0.050142 0-0.088004 0-0.150426 0-0.050142 0-0.11154 0-0.149403C905.28369 491.048829 896.620379 472.41647 882.734114 459.147258z"/></svg><span>${i18n.localize('control.btnLaunchLogcat', 'Launch + Logcat')}</span></button>
 <button class="btn" id="btnDebug" data-cmd="launch-debug">${i18n.localize('control.btnLaunchDebug', 'Debug Launch')}</button>
 <button class="btn secondary" id="btnRelease" data-cmd="launch-release">${i18n.localize('control.btnLaunchRelease', 'Build & Launch Release')}</button>
 <button class="btn secondary" id="btnOpenLogcat" data-cmd="open-logcat">${i18n.localize('control.btnViewLogcat', 'View Logcat')}</button>

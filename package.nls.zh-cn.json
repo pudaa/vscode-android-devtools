@@ -15,7 +15,7 @@
     "control.logcatManual": "手动",
     "control.apk": "APK",
     "control.activity": "启动入口",
-    "control.btnLaunchLogcat": "▶ 启动并查看日志",
+    "control.btnLaunchLogcat": "启动并查看日志",
     "control.btnLaunchDebug": "调试启动",
     "control.btnViewLogcat": "查看日志",
     "control.btnEditLaunchJson": "编辑 launch.json",
