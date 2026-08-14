@@ -20,6 +20,17 @@ class AndroidSocket extends EventEmitter {
             if (this.socket) {
                 return reject(new Error(`${this.which} Socket connect failed. Socket already connected. ${stackOnError}`));
             }
+            // reset per-connection state - these are instance-level and must not
+            // leak across repeated connect/disconnect cycles (a stale
+            // socket_ended from an old socket would make the new socket's reads
+            // fail immediately, and a stale socket_disconnecting would make
+            // disconnect() return a never-resolving promise)
+            this.socket_ended = false;
+            this.socket_error = null;
+            this.readbuffer = Buffer.alloc(0);
+            this.removeAllListeners('data-changed');
+            this.removeAllListeners('socket-ended');
+            this.socket_disconnecting = null;
             const connection_error = err => {
                 return reject(new Error(`${this.which} Socket connect failed. ${err.message}. ${stackOnError}`));
             }
@@ -59,13 +70,22 @@ class AndroidSocket extends EventEmitter {
     }
 
     disconnect() {
-        if (!this.socket_disconnecting) {
-            this.socket_disconnecting = new Promise(resolve => {
-                this.socket.end();
-                this.socket = null;
-                this.once('socket-ended', resolve);
-            });
+        if (this.socket_disconnecting) {
+            return this.socket_disconnecting;
         }
+        this.socket_disconnecting = new Promise(resolve => {
+            try {
+                this.socket && this.socket.end();
+            } catch (e) { /* already gone */ }
+            this.socket = null;
+            // resolve when the socket fully closes (or immediately if it
+            // already ended - e.g. repeated disconnect calls)
+            if (this.socket_ended) {
+                resolve();
+            } else {
+                this.once('socket-ended', resolve);
+            }
+        });
         return this.socket_disconnecting;
     }
 

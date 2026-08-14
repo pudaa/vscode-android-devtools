@@ -295,7 +295,7 @@ class ADBClient {
     /**
      * Starts the Logcat monitor.
      * Logcat lines are passed back via onlog callback. If the device disconnects, onclose is called.
-     * @param {{onlog:(e)=>void, onclose:(err)=>void}} o 
+     * @param {{onlog:(e)=>void, onclose:(err)=>void, filter?:string}} o 
      */
     async startLogcatMonitor(o) {
         // onlog:function(e)
@@ -316,31 +316,42 @@ class ADBClient {
             return logcatbuffer.toString();
         }
 
-        // start the logcat monitor
-        const next_logcat_lines = async () => {
+        // start the logcat monitor. A single fire-and-forget loop is used (no
+        // recursion) so a partial line keeps its buffer across reads and only
+        // ONE reader is ever active on the socket. The loop ends when the
+        // socket closes (endLogcatMonitor or device gone). startLogcatMonitor
+        // itself must return immediately - callers await it to know the
+        // monitor is up, and the loop would otherwise never resolve.
+        (async () => {
             let logcatbuffer = Buffer.alloc(0);
-            let next_data;
             for (;;) {
                 // read the next data from ADB
+                let next_data;
                 try {
                     next_data = await this.adbsocket.read_stdout();
                 } catch(e) {
+                    // the socket was closed (endLogcatMonitor or device gone)
                     o.onclose(e);
+                    return;
+                }
+                // an empty read means the stream ended (socket closed) - stop
+                // the loop instead of spinning on nothing forever
+                if (!next_data || !next_data.length) {
+                    o.onclose(null);
                     return;
                 }
                 logcatbuffer = Buffer.concat([logcatbuffer, next_data]);
                 const last_newline_index = logcatbuffer.lastIndexOf(10) + 1;
                 if (last_newline_index === 0) {
-                    // wait for a whole line
-                    next_logcat_lines();
-                    return;
+                    // wait for a whole line - loop again, keep the partial buffer
+                    continue;
                 }
                 // split into lines, sort and remove duplicates and blanks
                 const logs = logcatbuffer.slice(0, last_newline_index).toString()
                     .split(/\r\n?|\n/)
                     .sort()
                     .filter((line,idx,arr) => line && line !== arr[idx-1]);
-                
+
                 logcatbuffer = logcatbuffer.slice(last_newline_index);
                 const e = {
                     adbclient: this,
@@ -348,8 +359,7 @@ class ADBClient {
                 };
                 o.onlog(e);
             }
-        }
-        next_logcat_lines();
+        })();
     }
 
     endLogcatMonitor() {

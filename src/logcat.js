@@ -78,6 +78,9 @@ class LogcatContent {
         // the pids currently applied to the running logcat (package:mine mode);
         // used to detect app restarts and drop the filter when the app exits
         this._activePids = [];
+        // true while the monitor is being torn down for a filter/mode switch -
+        // suppresses "Device disconnected" notifications during the swap
+        this._restarting = false;
         // pending poll timer for package:mine auto-recovery (app not running yet)
         this._pidRetryTimer = null;
         this._adbclient = new ADBClient(deviceid);
@@ -249,23 +252,29 @@ class LogcatContent {
      * user toggles between "all logs" and "package:mine".
      */
     async restartMonitor() {
+        // suppress "Device disconnected" from the old monitor while we swap
+        this._restarting = true;
         try {
-            await this._adbclient.endLogcatMonitor();
-        } catch (e) { /* ignore */ }
-        this._state = 'connecting';
-        const filter = await this.buildFilterArgs();
-        await this._adbclient.startLogcatMonitor({
-            onlog: this.onLogcatContent.bind(this),
-            onclose: this.onLogcatDisconnect.bind(this),
-            filter,
-        });
-        this._state = 'connected';
-        // keep package:mine in sync with the app lifecycle
-        if (this._filterMode === 'mine' && this._packageName) {
-            this.schedulePidRetry(true);
+            try {
+                await this._adbclient.endLogcatMonitor();
+            } catch (e) { /* ignore */ }
+            this._state = 'connecting';
+            const filter = await this.buildFilterArgs();
+            await this._adbclient.startLogcatMonitor({
+                onlog: this.onLogcatContent.bind(this),
+                onclose: this.onLogcatDisconnect.bind(this),
+                filter,
+            });
+            this._state = 'connected';
+            // keep package:mine in sync with the app lifecycle
+            if (this._filterMode === 'mine' && this._packageName) {
+                this.schedulePidRetry(true);
+            }
+            // tell every client the filter changed (frontend can refresh its UI)
+            this.sendClientMessage(':filter_updated');
+        } finally {
+            this._restarting = false;
         }
-        // tell every client the filter changed (frontend can refresh its UI)
-        this.sendClientMessage(':filter_updated');
     }
 
     /**
@@ -490,6 +499,9 @@ class LogcatContent {
     }
     onLogcatDisconnect(/*e*/) {
         if (this._state === 'disconnected') return;
+        // ignore disconnects caused by an in-progress filter/mode switch - the
+        // monitor is being restarted, not actually lost
+        if (this._restarting) return;
         this._state = 'disconnected';
         this.sendDisconnectMsg();
     }
