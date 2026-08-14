@@ -1,5 +1,8 @@
 # Change Log
 
+### version 1.5.1
+* FIX: Sidebar views (Launch / Logcat / Settings) now declare `"type": "webview"` so they render correctly - the 1.5.0 package uploaded to the Marketplace predated this fix and showed "no registered data provider" for all three views.
+
 ### version 1.5.0 (first community release)
 * NEW: Sidebar UI - Android DevTools activity bar with three views (Launch / Logcat / Settings), no more command-palette-only workflow.
 * NEW: Launch view - one-click "Launch + Logcat", "Debug Launch" and "Build & Launch Release", visual config summary, edit launch.json shortcut.
