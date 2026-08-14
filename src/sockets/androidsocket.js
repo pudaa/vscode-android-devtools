@@ -30,6 +30,7 @@ class AndroidSocket extends EventEmitter {
             let error_handler = connection_error;
             this.socket = new net.Socket()
                 .once('connect', () => {
+                    clearTimeout(connect_timer);
                     error_handler = post_connection_error;
                     this.socket
                         .on('data', buffer => {
@@ -46,6 +47,12 @@ class AndroidSocket extends EventEmitter {
                     resolve();
                 })
                 .on('error', err => error_handler(err));
+            // guard against a hung connect (e.g. adb server not answering);
+            // never block the debug session forever on a dead local port
+            const connect_timer = setTimeout(() => {
+                this.socket.destroy();
+                reject(new Error(`${this.which} Socket connect failed. Connection timed out. ${stackOnError}`));
+            }, 10000);
             // for some reason if hostname is left blank, it will sometimes return ECONNREFUSED
             this.socket.connect(port, hostname || '127.0.0.1');
         });
@@ -86,7 +93,12 @@ class AndroidSocket extends EventEmitter {
             throw new Error(`${this.which} socket read failed. Attempt to read ${actual_length} bytes.`);
         }
         if (this.socket_ended) {
-            if (actual_length <= 0 || (this.readbuffer.byteLength < actual_length)) {
+            // EOF: for "read whatever is available" (stdout) reads this is
+            // normal - a command that produced no output closes the socket.
+            // For fixed-length reads it is an error (truncated reply).
+            if (typeof length === 'undefined') {
+                actual_length = this.readbuffer.byteLength;
+            } else if (actual_length <= 0 || (this.readbuffer.byteLength < actual_length)) {
                 this.check_socket_active('read');
             }
         }
@@ -99,8 +111,19 @@ class AndroidSocket extends EventEmitter {
             return Promise.resolve(result);
         }
         // wait for the socket to update and then retry the read
-        await this.wait_for_socket_data(timeout_ms);
-        return this.read_bytes(length, format);
+        // (pass the timeout down - otherwise a partial read recurses forever)
+        try {
+            await this.wait_for_socket_data(timeout_ms);
+        } catch (err) {
+            // EOF while reading stdout (e.g. 'am force-stop' produces no
+            // output, so the adb server closes the socket) is normal - return
+            // an empty result instead of failing the whole command.
+            if (typeof length === 'undefined' && /Socket closed/i.test(err.message)) {
+                return format ? Buffer.alloc(0).toString(format) : Buffer.alloc(0);
+            }
+            throw err;
+        }
+        return this.read_bytes(length, format, timeout_ms);
     }
 
     /**
@@ -109,6 +132,12 @@ class AndroidSocket extends EventEmitter {
      */
     wait_for_socket_data(timeout_ms) {
         return new Promise((resolve, reject) => {
+            // if the socket is already closed, there's nothing to wait for -
+            // fail fast instead of hanging forever (e.g. a shell command with
+            // no output where the EOF race lost against this call)
+            if (this.socket_ended) {
+                return reject(new Error(`${this.which} socket read failed. Socket closed.`));
+            }
             let done = 0, timer = null;
             let onDataChanged = () => {
                 if ((done += 1) !== 1) return;
@@ -153,8 +182,14 @@ class AndroidSocket extends EventEmitter {
             return buf;
         }
         const parts = [buf];
+        // bound the whole drain so a wedged adb/device can't hang us forever
+        const deadline = Date.now() + 30000;
         try {
             for (;;) {
+                // the socket is already ended - no more data will ever arrive
+                if (this.socket_ended || Date.now() > deadline) {
+                    break;
+                }
                 buf = await this.read_bytes(undefined, null);
                 parts.push(buf);
             }

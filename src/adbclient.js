@@ -282,7 +282,12 @@ class ADBClient {
     async shell_cmd(o, timeout_ms) {
         await this.connect_to_adb();
         await this.adbsocket.cmd_and_status(`host:transport:${this.deviceid}`);
-        const stdout = await this.adbsocket.cmd_and_read_stdout(`shell:${o.command}`, timeout_ms, o.untilclosed);
+        // never block forever waiting for shell output - even a quiet command
+        // (e.g. 'am force-stop') must not hang the extension if adb misbehaves
+        const effective_timeout = (typeof timeout_ms === 'number' && timeout_ms >= 0)
+            ? timeout_ms
+            : 30000;
+        const stdout = await this.adbsocket.cmd_and_read_stdout(`shell:${o.command}`, effective_timeout, o.untilclosed);
         await this.disconnect_from_adb();
         return stdout;
     }

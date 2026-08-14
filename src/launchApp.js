@@ -57,6 +57,9 @@ function pickLaunchActivity(cfg, info) {
 
 /**
  * Install the APK on the device if the installed one differs (hash compare).
+ * When the installed signature differs (e.g. a release APK over a debug build,
+ * or vice versa) `pm install -r` fails with INSTALL_FAILED_UPDATE_INCOMPATIBLE;
+ * in that case uninstall first, then install fresh (like Android Studio does).
  * @param {ADBClient} adb
  * @param {import('./apk-file-info').APKFileInfo} info
  * @param {string[]|undefined} pmInstallArgs
@@ -78,45 +81,74 @@ async function ensureInstalled(adb, info, pmInstallArgs) {
     const out = await adb.shell_cmd({ command: `pm install ${args} /data/local/tmp/debug.apk` });
     const failure = (out || '').match(/Failure\s+\[[^\]]+\]/g);
     if (failure) {
-        throw new Error('Installation failed. ' + failure[0]);
+        const first = failure[0];
+        // signature mismatch: uninstall the conflicting build, then retry once
+        if (/UPDATE_INCOMPATIBLE|SIGNATURE|INCOMPATIBLE/.test(first)) {
+            await adb.shell_cmd({ command: `pm uninstall ${info.manifest.package}` });
+            const out2 = await adb.shell_cmd({ command: `pm install ${args.replace(/\s*-r\s*/,' ')} /data/local/tmp/debug.apk` });
+            const failure2 = (out2 || '').match(/Failure\s+\[[^\]]+\]/g);
+            if (failure2) {
+                throw new Error('Installation failed. ' + failure2[0]);
+            }
+            return;
+        }
+        throw new Error('Installation failed. ' + first);
     }
 }
 
 /**
  * Run the launch.json preLaunchTask (e.g. "run gradle") and wait for it to finish,
- * so the APK is built before we install & launch. No-op if none is configured or
- * the task infrastructure is unavailable.
+ * so the APK is built before we install & launch.
  * @param {string|undefined} taskName
+ * @throws {Error} when the task is configured but cannot be found or run
  */
 async function runPreLaunchTask(taskName) {
     if (!taskName) return;
-    try {
-        const tasks = await vscode.tasks.fetchTasks();
-        const task = tasks.find(t => t.name === taskName || t.label === taskName);
-        if (!task) return;
-        await new Promise((resolve) => {
-            const sub = vscode.tasks.onDidEndTaskProcess(e => {
-                if (e.execution && e.execution.task === task) {
-                    sub.dispose();
+    const tasks = await vscode.tasks.fetchTasks();
+    const task = tasks.find(t => t.name === taskName || t.label === taskName);
+    if (!task) {
+        throw new Error(i18n.localize('launch.taskMissing', 'preLaunchTask "{0}" was not found in tasks.json. Add it or remove the preLaunchTask setting.', taskName));
+    }
+    await new Promise((resolve, reject) => {
+        let settled = false;
+        const timer = setTimeout(() => {
+            settled = true;
+            sub.dispose();
+            reject(new Error(i18n.localize('launch.taskTimeout', 'preLaunchTask "{0}" timed out after 10 minutes.', taskName)));
+        }, 10 * 60 * 1000);
+        const sub = vscode.tasks.onDidEndTaskProcess(e => {
+            if (settled) return;
+            if (e.execution && e.execution.task === task) {
+                clearTimeout(timer);
+                settled = true;
+                sub.dispose();
+                if (e.exitCode !== 0) {
+                    reject(new Error(i18n.localize('launch.taskFailed', 'preLaunchTask "{0}" exited with code {1}.', taskName, e.exitCode)));
+                } else {
                     resolve();
                 }
-            });
-            vscode.tasks.executeTask(task);
+            }
         });
-    } catch (e) { /* task infrastructure unavailable - continue anyway */ }
+        vscode.tasks.executeTask(task);
+    });
 }
 
 /**
  * Run a gradle task (e.g. assembleDebug / assembleRelease) via the project's
  * gradle wrapper, with a progress notification.
  * @param {string} task
+ * @throws {Error} when the gradle wrapper is missing or the build fails
  */
 async function runGradleTask(task) {
     const folders = vscode.workspace.workspaceFolders;
     const root = folders && folders[0] ? folders[0].uri.fsPath : '';
-    if (!root) return;
+    if (!root) {
+        throw new Error(i18n.localize('launch.noWorkspace', 'No workspace folder is open - cannot build the APK.'));
+    }
     const gradlew = path.join(root, /^win/.test(process.platform) ? 'gradlew.bat' : 'gradlew');
-    if (!fs.existsSync(gradlew)) return;
+    if (!fs.existsSync(gradlew)) {
+        throw new Error(i18n.localize('launch.gradleMissing', 'Gradle wrapper not found at {0}. Configure "gradleTask" or "preLaunchTask" in launch.json.', gradlew));
+    }
     await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: i18n.localize('launch.building', 'Building APK ({0})...', task) },
         () => new Promise((resolve, reject) => {
@@ -201,6 +233,13 @@ async function launchAppAndOpenLogcat(variant) {
 
         await ensureInstalled(adb, info, cfg.pmInstallArgs);
 
+        // force-stop first so `am start` begins from a clean state (a leftover
+        // "waiting for debugger" process from an interrupted debug session would
+        // otherwise just resume on the foreground and appear frozen)
+        try {
+            await adb.shell_cmd({ command: `am force-stop ${info.manifest.package}` });
+        } catch (e) { /* best effort - no output from force-stop */ }
+
         const launchActivity = pickLaunchActivity(cfg, info);
         let out = await adb.shell_cmd({ command: `am start -n ${info.manifest.package}/${launchActivity}` });
         if (/Permission Denial|not exported|Error:|Activity not found|does not exist/i.test(out)) {
@@ -210,6 +249,19 @@ async function launchAppAndOpenLogcat(variant) {
                 vscode.window.showErrorMessage(i18n.localize('launch.startFailed', 'Failed to start the app: {0}', String(out || '').trim().slice(0, 200)));
                 return;
             }
+        }
+        // confirm the app process actually came up (am start can return success
+        // even when the app immediately crashes or stays stuck)
+        let pid = '';
+        for (let i = 0; i < 10; i++) {
+            pid = await adb.shell_cmd({ command: `pidof ${info.manifest.package}` });
+            pid = String(pid || '').trim();
+            if (pid) break;
+            await new Promise(r => setTimeout(r, 1000));
+        }
+        if (!pid) {
+            vscode.window.showErrorMessage(i18n.localize('launch.processMissing', 'The app was started but its process is not running. It may have crashed or is waiting for a debugger. Check the logcat output.'));
+            return;
         }
 
         // open the sidebar logcat view

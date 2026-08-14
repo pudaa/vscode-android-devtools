@@ -28,9 +28,9 @@ class ADBSocket extends AndroidSocket {
      * @param {string} command
      * @param {boolean} [throw_on_fail] true if the function should throw on non-OKAY status
      */
-    async read_adb_status(command, throw_on_fail = true) {
-        // read back the status
-        const status = await this.read_bytes(4, 'latin1')
+    async read_adb_status(command, throw_on_fail = true, timeout_ms = 10000) {
+        // read back the status - bounded so a wedged adb server can't hang us forever
+        const status = await this.read_bytes(4, 'latin1', timeout_ms)
         if (status !== 'OKAY' && throw_on_fail) {
             throw new Error(`ADB command '${command}' failed. Status: '${status}'`);
         }
@@ -40,12 +40,12 @@ class ADBSocket extends AndroidSocket {
     /**
      * Reads and decodes an ADB reply. The reply is always in the form XXXXnnnn where XXXX is a 4 digit ascii hex length
      */
-    async read_adb_reply() {
-        const hexlen = await this.read_bytes(4, 'latin1');
+    async read_adb_reply(timeout_ms = 10000) {
+        const hexlen = await this.read_bytes(4, 'latin1', timeout_ms);
         if (/[^\da-fA-F]/.test(hexlen)) {
             throw new Error('Bad ADB reply - invalid length data');
         }
-        return this.read_bytes(parseInt(hexlen, 16), 'latin1');
+        return this.read_bytes(parseInt(hexlen, 16), 'latin1', timeout_ms);
     }
 
     /**
@@ -77,7 +77,6 @@ class ADBSocket extends AndroidSocket {
         await this.cmd_and_status(command);
         return this.read_adb_reply();
     }
-
     /**
      * Sends an ADB command, checks the returned status and then reads raw data from the socket
      * @param {string} command 

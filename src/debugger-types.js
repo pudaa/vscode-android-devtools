@@ -41,6 +41,15 @@ class LaunchBuildInfo extends BuildInfo {
          * @type {string}
          */
         this.fallbackLaunchActivity = '';
+        /**
+         * When true, launch the app with '-D' (wait for debugger) so breakpoints
+         * hit from Application.onCreate. Defaults to false: a plain launch plus
+         * attach is used instead, which is reliable on every device (some
+         * Huawei/EMUI builds never answer a JDWP connection to a '-D' waiting
+         * process, which would leave the app stuck on "waiting for debugger").
+         * @type {boolean}
+         */
+        this.waitForDebugger = false;
         /** 
          * the amount of time (in millis) to wait after 'am start ...' is invoked.
          * We need this because invoking JDWP too soon causes a hang.

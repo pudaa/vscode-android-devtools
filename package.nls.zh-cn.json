@@ -73,5 +73,11 @@
     "launch.buildFailed": "Gradle 编译失败：{0}",
     "launch.adbFailed": "无法启动 ADB 服务，请设置 ANDROID_HOME 或将 adb 添加到 PATH。",
     "launch.startFailed": "启动应用失败：{0}",
-    "launch.failed": "启动失败：{0}"
+    "launch.failed": "启动失败：{0}",
+    "launch.noWorkspace": "未打开工作区文件夹，无法编译 APK。",
+    "launch.gradleMissing": "未找到 Gradle 包装器：{0}。请在 launch.json 中配置 \"gradleTask\" 或 \"preLaunchTask\"。",
+    "launch.taskMissing": "在 tasks.json 中未找到 preLaunchTask \"{0}\"。请添加它或移除 preLaunchTask 配置。",
+    "launch.taskTimeout": "preLaunchTask \"{0}\" 已超过 10 分钟仍未完成。",
+    "launch.taskFailed": "preLaunchTask \"{0}\" 以退出码 {1} 结束。",
+    "launch.processMissing": "应用已启动但其进程未在运行，可能已崩溃或在等待调试器。请查看 logcat 输出。"
 }

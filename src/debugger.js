@@ -89,33 +89,94 @@ class Debugger extends EventEmitter {
         }
         this.session = new DebugSession(build, deviceid);
         const fallback_args = this.getLauncherFallbackArgs(build);
-        const stdout = await Debugger.runApp(deviceid, build.startCommandArgs, build.postLaunchPause, fallback_args);
 
-        try {
-            // 轮询等待目标进程出现（刚覆盖安装后的冷启动可能较慢），
-            // 避免"应用启动了但调试器没 attach 上"导致的退出/不进入
-            const pid = await Debugger.waitForDebugProcess(build, deviceid, 30e3);
+        // Launch mode:
+        //  - build.waitForDebugger === true  -> 'am start -D' (classic wait-for-
+        //    debugger; lets breakpoints hit from Application.onCreate).
+        //  - otherwise (default) -> plain launch, then attach to the running
+        //    process. This mirrors Android Studio's reliable path: on some
+        //    devices (certain Huawei/EMUI builds) a '-D' waiting process never
+        //    answers the JDWP handshake, leaving the app stuck on the
+        //    "waiting for debugger" screen forever.
+        const stripD = arr => (arr || []).filter(a => String(a).trim() !== '-D');
+        const useWaitForDebugger = build.waitForDebugger === true;
+        const launch_args = useWaitForDebugger ? build.startCommandArgs : stripD(build.startCommandArgs);
+        const fb = useWaitForDebugger ? fallback_args : (fallback_args ? stripD(fallback_args) : null);
+        const stdout = await Debugger.runApp(deviceid, launch_args, build.postLaunchPause, fb);
 
-            // after connect(), the caller must call resume() to begin
-            await this.connect(pid);
-            return stdout;
-        } catch (err) {
-            // The app was launched with '-D' (waiting for a debugger). If the
-            // attach failed for any reason, restart it WITHOUT '-D' so it is
-            // usable again instead of hanging on "waiting for debugger" forever.
+        // 轮询等待目标进程出现（刚覆盖安装后的冷启动可能较慢），
+        // 避免"应用启动了但调试器没 attach 上"导致的退出/不进入
+        const pid = await Debugger.waitForDebugProcess(build, deviceid, 30e3);
+
+        // Connect to the freshly launched process. On some devices (e.g.
+        // certain Huawei/EMUI builds) the JDWP agent only starts answering
+        // 10-30s after the process is up, and the first connection attempt
+        // fails with a stale socket bridge. Poll until the handshake succeeds
+        // (with a fresh adb forward each time) instead of giving up on the
+        // first hiccup - and never hang on a single attempt.
+        let last_err;
+        for (let attempt = 1; attempt <= 6; attempt++) {
+            try {
+                // after connect(), the caller must call resume() to begin
+                await this.connect(pid);
+                return stdout;
+            } catch (err) {
+                last_err = err;
+                if (attempt < 6) {
+                    D(`JDWP attach attempt ${attempt} failed (${err.message}) - retrying with a fresh forward`);
+                    // connect() -> disconnect() clears this.session, so
+                    // recreate it before the next attempt
+                    if (!this.session) {
+                        this.session = new DebugSession(build, deviceid);
+                    }
+                    // disconnect() already removed the stale forward; give
+                    // the device a moment before re-connecting
+                    await sleep(5000);
+                }
+            }
+        }
+        // all attempts failed: if we used '-D', relaunch without it and retry
+        // (the app must never stay stuck on "waiting for debugger")
+        if (useWaitForDebugger) {
             try {
                 await new ADBClient(deviceid).shell_cmd({ command: `am force-stop ${build.pkgname}` });
-                const stripD = arr => (arr || []).filter(a => String(a).trim() !== '-D');
-                const fb = this.getLauncherFallbackArgs(build);
-                await Debugger.runApp(deviceid, stripD(build.startCommandArgs), build.postLaunchPause, fb ? stripD(fb) : null);
-            } catch (e2) { /* best effort */ }
-            throw new Error(`Could not attach the debugger to ${build.pkgname}: ${err.message} (the app was restarted without debugging so it stays usable)`);
+                await Debugger.runApp(deviceid, stripD(build.startCommandArgs), build.postLaunchPause, fb);
+            } catch (e2) {
+                throw new Error(`Could not attach the debugger to ${build.pkgname}: ${last_err.message} (also failed to relaunch the app: ${e2.message || e2})`);
+            }
+            try {
+                const pid2 = await Debugger.waitForDebugProcess(build, deviceid, 20e3);
+                for (let attempt = 1; attempt <= 6; attempt++) {
+                    try {
+                        if (!this.session) {
+                            this.session = new DebugSession(build, deviceid);
+                        }
+                        await this.connect(pid2);
+                        D('Attached to the running (non-debug) app instance - early breakpoints may be missed');
+                        return stdout;
+                    } catch (err2) {
+                        if (attempt < 6) {
+                            if (!this.session) {
+                                this.session = new DebugSession(build, deviceid);
+                            }
+                            await sleep(5000);
+                        } else {
+                            throw err2;
+                        }
+                    }
+                }
+            } catch (e3) {
+                throw new Error(`Could not attach the debugger to ${build.pkgname}: ${last_err.message} (the app was restarted without debugging and stays usable, but the debug session could not attach: ${e3.message})`);
+            }
         }
+        throw last_err;
     }
 
     /**
      * 轮询查找目标应用的可调试进程，直到找到匹配包名的进程或超时。
      * 与旧的"只查询一次(10s)"不同，这里会持续轮询，兼容新安装后的慢速冷启动。
+     * 找不到包名匹配时：若设备上恰好只有一个可调试进程则使用它，
+     * 否则不盲选（避免 attach 到错误的应用）并持续等待直至超时报错。
      * @param {LaunchBuildInfo} build
      * @param {string} deviceid
      * @param {number} timeout_ms 总等待超时
@@ -123,13 +184,9 @@ class Debugger extends EventEmitter {
      */
     static async waitForDebugProcess(build, deviceid, timeout_ms) {
         const start_time = Date.now();
-        let last_named_pids = [];
         for (;;) {
             // 每次查询使用较短的读取超时，便于快速重试
             const named_pids = await Debugger.getDebuggableProcesses(deviceid, 5e3);
-            if (named_pids.length) {
-                last_named_pids = named_pids;
-            }
             // 优先精确匹配包名（通常能命中刚启动的应用）
             if (build.pkgname) {
                 const matched = named_pids.filter(np => np.name === build.pkgname);
@@ -137,18 +194,18 @@ class Debugger extends EventEmitter {
                     // 多个匹配时取最后一个（通常是刚启动的那个）
                     return matched[matched.length - 1].pid;
                 }
-            } else if (named_pids.length > 0) {
-                // 无包名信息时退回"取最后一个"的旧行为
-                D('No process name match - choosing last jdwp pid');
-                return named_pids[named_pids.length - 1].pid;
+            }
+            // 无包名信息（或包名解析失败）时：仅当设备上只有一个可调试
+            // 进程才用它 - 多个进程时继续等待，绝不 attach 到错误的应用
+            if (!build.pkgname && named_pids.length === 1) {
+                D('Single debuggable process found - using it');
+                return named_pids[0].pid;
             }
             // 超时检查
             if (Date.now() - start_time >= timeout_ms) {
-                if (last_named_pids.length > 0) {
-                    D('Timeout waiting for target process - choosing last jdwp pid');
-                    return last_named_pids[last_named_pids.length - 1].pid;
-                }
-                throw new Error(`startDebugSession: No debuggable processes after app launch.`);
+                const names = named_pids.map(np => `${np.name||'?'}:${np.pid}`).join(', ');
+                throw new Error(`startDebugSession: No debuggable process matching '${build.pkgname||'(any)'}' after app launch.` +
+                    (names ? ` Found: ${names}` : ' No debuggable processes.'));
             }
             // 稍等片刻再查，给应用留出冷启动时间
             await sleep(1000);

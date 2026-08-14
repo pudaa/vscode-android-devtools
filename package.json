@@ -390,6 +390,11 @@
                                 "type": "boolean",
                                 "description": "Set to true to output debugging logs for diagnostics",
                                 "default": false
+                            },
+                            "waitForDebugger": {
+                                "type": "boolean",
+                                "description": "Launch the app with '-D' so the VM waits for the debugger before Application.onCreate (breakpoints can hit from the very start). Default: false - the app is launched normally and the debugger attaches to the running process, which is reliable on all devices (some devices never answer JDWP for a '-D' waiting process and would leave the app stuck on 'waiting for debugger').",
+                                "default": false
                             }
                         }
                     },

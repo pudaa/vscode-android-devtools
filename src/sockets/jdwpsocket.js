@@ -25,7 +25,12 @@ class JDWPSocket extends AndroidSocket {
     async start() {
         const handshake = 'JDWP-Handshake';
         await this.write_bytes(handshake);
-        const handshake_reply = await this.read_bytes(handshake.length, 'latin1');
+        // Give the device a hard limit to reply. On some devices (e.g. certain
+        // Huawei/EMUI builds) the JDWP agent never answers the handshake when
+        // the app was launched with '-D' but the socket bridge is stale. Without
+        // a timeout this read blocks forever and the debug session hangs while
+        // the app sits on the "waiting for debugger" screen.
+        const handshake_reply = await this.read_bytes(handshake.length, 'latin1', 10000);
         if (handshake_reply !== handshake) {
             throw new Error('JDWP handshake failed');
         }

@@ -73,5 +73,11 @@
     "launch.buildFailed": "Gradle build failed: {0}",
     "launch.adbFailed": "ADB server could not be started. Set ANDROID_HOME or add adb to PATH.",
     "launch.startFailed": "Failed to start the app: {0}",
-    "launch.failed": "Launch failed: {0}"
+    "launch.failed": "Launch failed: {0}",
+    "launch.noWorkspace": "No workspace folder is open - cannot build the APK.",
+    "launch.gradleMissing": "Gradle wrapper not found at {0}. Configure \"gradleTask\" or \"preLaunchTask\" in launch.json.",
+    "launch.taskMissing": "preLaunchTask \"{0}\" was not found in tasks.json. Add it or remove the preLaunchTask setting.",
+    "launch.taskTimeout": "preLaunchTask \"{0}\" timed out after 10 minutes.",
+    "launch.taskFailed": "preLaunchTask \"{0}\" exited with code {1}.",
+    "launch.processMissing": "The app was started but its process is not running. It may have crashed or is waiting for a debugger. Check the logcat output."
 }

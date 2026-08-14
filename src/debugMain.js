@@ -741,9 +741,12 @@ class AndroidDebugSession extends DebugSession {
             this.apk_file_info.manifest.package,
             launchActivity,
             this.am_start_args,
-            postLaunchPause);
+            args.postLaunchPause);
         // fall back to the manifest launcher if the configured activity can't start
         build.fallbackLaunchActivity = this.apk_file_info.manifest.launcher;
+        // launch with '-D' (wait for debugger) only when explicitly requested;
+        // default is a plain launch + attach which is reliable on every device
+        build.waitForDebugger = args.waitForDebugger === true;
 
         this.LOG(`Launching on device ${this._device.serial} [API:${this.device_api_level||'?'}]`);
         if (this.am_start_args) {
