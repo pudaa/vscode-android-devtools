@@ -75,6 +75,9 @@ class LogcatContent {
         this._filterMode = options.filterMode || (this._packageName ? 'mine' : 'all');
         // specific process selected via the toolbar process dropdown ('process' mode)
         this._processPid = null;
+        // the pids currently applied to the running logcat (package:mine mode);
+        // used to detect app restarts and drop the filter when the app exits
+        this._activePids = [];
         // pending poll timer for package:mine auto-recovery (app not running yet)
         this._pidRetryTimer = null;
         this._adbclient = new ADBClient(deviceid);
@@ -158,7 +161,7 @@ class LogcatContent {
      */
     async getAppPids(pkg) {
         try {
-            const out = await new ADBClient(this._logcatid).shell_cmd({ command: `pidof ${pkg}`, untilclosed: true });
+            const out = await this._adbclient.shell_cmd({ command: `pidof ${pkg}`, untilclosed: true }, 8000);
             return String(out).trim().split(/\s+/).filter(x => x && /^\d+$/.test(x));
         } catch (e) {
             return [];
@@ -169,6 +172,10 @@ class LogcatContent {
      * Build the effective logcat filter arguments for the current filter mode.
      * 'mine' => '--pid=<app pids...>' (package:mine, like Android Studio),
      * merged with any static logcatFilter from launch.json.
+     * When the app is not running yet, fall back to NO pid filter (full device
+     * log) instead of '-s' (silent) - '-s' with no tag matches shows only the
+     * "beginning of main/system" markers and nothing else, which looks broken.
+     * The pid poll then restarts the monitor automatically once the app starts.
      * @returns {Promise<string>}
      */
     async buildFilterArgs() {
@@ -178,13 +185,14 @@ class LogcatContent {
             const pids = await this.getAppPids(this._packageName);
             if (pids.length) {
                 // app is running - cancel any pending retry and filter by pid
-                this.schedulePidRetry(false);
+                this.schedulePidRetry(true);
+                this._activePids = pids;
                 pid_args = pids.map(p => `--pid=${p}`).join(' ');
             } else {
-                // app not running yet: stay silent (-s) but keep polling so the
-                // logcat starts streaming automatically once the app comes up
+                // app not running yet: show everything for now, but keep polling
+                // so the filter switches to package:mine once the app comes up
+                this._activePids = [];
                 this.schedulePidRetry(true);
-                pid_args = '-s';
             }
         } else if (this._filterMode === 'process' && this._processPid) {
             pid_args = `--pid=${this._processPid}`;
@@ -193,8 +201,14 @@ class LogcatContent {
     }
 
     /**
-     * Schedule (or cancel) a poll that restarts the monitor once the app process
-     * appears, so package:mine stops being silent automatically.
+     * Schedule (or cancel) a poll that keeps package:mine filtering in sync with
+     * the app process. While filterMode is 'mine' the poll runs continuously:
+     *   - app not running        -> show everything, poll every 2s
+     *   - app running, no filter -> switch to --pid=<pids>
+     *   - app pid changed        -> restart monitor with the new pids
+     *   - app exited             -> drop the pid filter (show everything again)
+     * This makes the view robust to app restarts (and to the view being opened
+     * before the app has started) instead of silently freezing on an empty log.
      * @param {boolean} need true = app not running, keep polling
      */
     schedulePidRetry(need) {
@@ -205,16 +219,26 @@ class LogcatContent {
         if (!need) return;
         this._pidRetryTimer = setTimeout(async () => {
             this._pidRetryTimer = null;
-            if (this._filterMode !== 'mine') return;
+            if (this._filterMode !== 'mine' || !this._packageName) return;
             const pids = await this.getAppPids(this._packageName);
-            if (pids.length) {
-                try {
+            const current_pids = (this._activePids || []).join(',');
+            const new_pids = pids.join(',');
+            try {
+                if (pids.length && new_pids !== current_pids) {
+                    // app came up (or restarted): switch to package:mine filtering
                     await this.restartMonitor();
-                } catch (e) { /* keep silent until the next poll */ }
-            } else {
+                } else if (!pids.length && current_pids) {
+                    // app exited: drop the pid filter so the log stays visible
+                    this._activePids = [];
+                    await this.restartMonitor();
+                } else if (!pids.length && !current_pids) {
+                    // still not running - keep polling
+                    this.schedulePidRetry(true);
+                }
+            } catch (e) {
                 this.schedulePidRetry(true);
             }
-        }, 3000);
+        }, 2000);
     }
 
     /**
@@ -233,6 +257,10 @@ class LogcatContent {
             filter,
         });
         this._state = 'connected';
+        // keep package:mine in sync with the app lifecycle
+        if (this._filterMode === 'mine' && this._packageName) {
+            this.schedulePidRetry(true);
+        }
         // tell every client the filter changed (frontend can refresh its UI)
         this.sendClientMessage(':filter_updated');
     }
@@ -247,6 +275,11 @@ class LogcatContent {
         }
         this._filterMode = mode;
         this._processPid = null;
+        this._activePids = [];
+        if (this._pidRetryTimer) {
+            clearTimeout(this._pidRetryTimer);
+            this._pidRetryTimer = null;
+        }
         try {
             await this.restartMonitor();
         } catch (err) {
@@ -265,6 +298,11 @@ class LogcatContent {
         }
         this._filterMode = 'process';
         this._processPid = pid;
+        this._activePids = [];
+        if (this._pidRetryTimer) {
+            clearTimeout(this._pidRetryTimer);
+            this._pidRetryTimer = null;
+        }
         try {
             await this.restartMonitor();
         } catch (err) {
@@ -380,9 +418,18 @@ class LogcatContent {
     htmlBootstrap(vars) {
         if (!this._htmltemplate)
             this._htmltemplate = fs.readFileSync(path.join(__dirname,'res/logcat.html'), 'utf8');
+        // log direction preference: false = terminal style (new lines at the
+        // bottom, the default), true = Android Studio style (newest at the top)
+        let newestFirst = false;
+        try {
+            const vscode = require('vscode');
+            const cfg = vscode.workspace.getConfiguration('android-dev-ext');
+            newestFirst = cfg.get('logcatNewestFirst', false) === true;
+        } catch (e) { /* not inside the extension host */ }
         vars = Object.assign({
             logcatid: this._logcatid,
             wssport: Server.options.port,
+            lNewestFirst: newestFirst,
             lFilterPlaceholder: loc('logcat.filterPlaceholder', 'Filter regex (e.g. word|error)'),
             lFilterTitle: loc('logcat.filterTitle', 'Filter regex'),
             lPause: loc('logcat.pause', 'Pause / resume'),

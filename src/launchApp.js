@@ -165,11 +165,23 @@ async function runGradleTask(task) {
 
 /**
  * Build the APK for the requested variant.
- * Priority: explicit gradleTask -> configured preLaunchTask -> gradlew assemble<Variant>.
+ * debug:   gradleTask -> preLaunchTask -> gradlew assembleDebug
+ * release: releaseGradleTask -> gradlew assembleRelease
+ * (the debug preLaunchTask must NOT run for release - it usually builds
+ *  assembleDebug, which would leave the release APK missing)
  * @param {string} variant 'debug' | 'release'
  * @param {*} cfg
  */
 async function buildApk(variant, cfg) {
+    if (variant === 'release') {
+        const task = cfg.releaseGradleTask && String(cfg.releaseGradleTask).trim();
+        if (task) {
+            await runGradleTask(task);
+            return;
+        }
+        await runGradleTask('assembleRelease');
+        return;
+    }
     const task = cfg.gradleTask && String(cfg.gradleTask).trim();
     if (task) {
         await runGradleTask(task);
@@ -179,7 +191,36 @@ async function buildApk(variant, cfg) {
         await runPreLaunchTask(cfg.preLaunchTask);
         return;
     }
-    await runGradleTask(variant === 'release' ? 'assembleRelease' : 'assembleDebug');
+    await runGradleTask('assembleDebug');
+}
+
+/**
+ * Find the APK that the build actually produced for the release variant.
+ * The configured apkFile points at the debug APK; the release output lives in
+ * the sibling .../apk/release/ folder, but its name varies (app-release.apk,
+ * app-release-unsigned.apk, custom names...). Scan that folder and pick the
+ * newest *.apk (excluding androidTest). Falls back to the predictable path so
+ * the caller can still produce a clear "APK not found" error.
+ * @param {string} debugApkFile resolved debug APK path
+ * @returns {string}
+ */
+function resolveReleaseApk(debugApkFile) {
+    const rel = String(debugApkFile || '');
+    // .../apk/debug/app-debug.apk -> .../apk/release/
+    const releaseDir = rel
+        .replace(/[\\/]debug[\\/][^\\/]+$/, '/release/')
+        .replace(/-debug\.apk$/i, '');
+    const predictable = releaseDir + 'app-release.apk';
+    try {
+        const files = fs.readdirSync(releaseDir)
+            .filter(f => /\.apk$/i.test(f) && !/androidTest/i.test(f))
+            .map(f => ({ f, t: fs.statSync(releaseDir + f).mtimeMs }))
+            .sort((a, b) => b.t - a.t);
+        if (files.length) {
+            return releaseDir + files[0].f;
+        }
+    } catch (e) { /* dir missing - fall through */ }
+    return predictable;
 }
 
 /**
@@ -211,8 +252,11 @@ async function launchAppAndOpenLogcat(variant) {
         // 1. build the requested variant
         await buildApk(buildVariant, cfg);
 
-        // 2. resolve the APK for this variant
-        const apkFile = resolveVariantApk(resolveWorkspacePath(cfg.apkFile), buildVariant);
+        // 2. resolve the APK for this variant (release output name varies:
+        //    app-release.apk / app-release-unsigned.apk / custom names)
+        const apkFile = buildVariant === 'release'
+            ? resolveReleaseApk(resolveWorkspacePath(cfg.apkFile))
+            : resolveWorkspacePath(cfg.apkFile);
         if (!apkFile) {
             vscode.window.showErrorMessage(i18n.localize('launch.noApk', 'No apkFile configured in launch.json'));
             return;
@@ -274,6 +318,7 @@ async function launchAppAndOpenLogcat(variant) {
 module.exports = {
     launchAppAndOpenLogcat,
     pickLaunchActivity,
-    runPreLaunchTask,
+    resolveReleaseApk,
     resolveVariantApk,
+    runPreLaunchTask,
 };

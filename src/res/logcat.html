@@ -210,6 +210,9 @@
                     var paused = false;
                     var autoScroll = true;
                     var levelFilter = { V:true, D:true, I:true, W:true, E:true, F:true };
+                    // log direction: true = newest at the top (Android Studio style),
+                    // false = newest at the bottom (terminal style, the default)
+                    var newestFirst = !{lNewestFirst} === true;
                     var pendingLines = [];
                     // performance: cached visible row count + rAF-batched rendering
                     var visibleCount = 0;
@@ -218,10 +221,29 @@
                     // Cap the number of rendered log rows so the page doesn't get slower
                     // as logs accumulate (DOM nodes were previously never removed).
                     var MAX_LOG_ROWS = 3000;
+
+                    // ── re-order the bootstrap history to match the direction ──
+                    // The backend buffers history newest-first; terminal style wants
+                    // oldest at the top, newest at the bottom. Move the row nodes
+                    // around once, at startup (cheap, happens before any live data).
+                    var reorderHistory = function(rows) {
+                        if (!newestFirst) {
+                            var logs = rows.getElementsByClassName('log');
+                            var arr = Array.prototype.slice.call(logs);
+                            // currently newest-first -> reverse to oldest-first
+                            arr.reverse();
+                            arr.forEach(function(el) { rows.appendChild(el); });
+                        }
+                    };
+                    // re-order the bootstrap history so it matches the direction
+                    reorderHistory(rows);
+
                     var trimLogRows = function(rows) {
                         var all = rows.getElementsByClassName('log');
                         while (all.length > MAX_LOG_ROWS) {
-                            var last = all[all.length - 1];
+                            // newest-first: drop the OLDEST rows at the bottom;
+                            // terminal style: drop the OLDEST rows at the top
+                            var last = newestFirst ? all[all.length - 1] : all[0];
                             if (last && last.parentNode) {
                                 if (!last.classList.contains('filter')) visibleCount--;
                                 last.parentNode.removeChild(last);
@@ -295,20 +317,36 @@
                         // batch-insert via a DocumentFragment so the browser lays out
                         // once instead of once per row (big win for high log rates)
                         const frag = document.createDocumentFragment();
-                        // iterate newest-first so the newest line ends up at the top
-                        for (let i = pendingLines.length - 1; i >= 0; i--) {
-                            const line = pendingLines[i];
-                            const parsed = parseLog(line);
-                            const row = buildRow(parsed, line);
-                            if (applyAllFilters(row)) visibleCount++;
-                            frag.appendChild(row);
+                        // pendingLines is chronological (oldest first)
+                        if (newestFirst) {
+                            // Android Studio style: newest lines go to the top, so
+                            // iterate newest->oldest while appending to the fragment
+                            for (let i = pendingLines.length - 1; i >= 0; i--) {
+                                const line = pendingLines[i];
+                                const parsed = parseLog(line);
+                                const row = buildRow(parsed, line);
+                                if (applyAllFilters(row)) visibleCount++;
+                                frag.appendChild(row);
+                            }
+                            rows.insertBefore(frag, rows.firstChild);
+                        } else {
+                            // terminal style (default): append to the bottom in order
+                            for (let i = 0; i < pendingLines.length; i++) {
+                                const line = pendingLines[i];
+                                const parsed = parseLog(line);
+                                const row = buildRow(parsed, line);
+                                if (applyAllFilters(row)) visibleCount++;
+                                frag.appendChild(row);
+                            }
+                            rows.appendChild(frag);
                         }
-                        rows.insertBefore(frag, rows.firstChild);
                         logcount += pendingLines.length;
                         pendingLines.length = 0;
                         trimLogRows(rows);
                         updateLogCountDisplay();
-                        if (autoScroll) rows.scrollTop = 0;
+                        if (autoScroll) {
+                            rows.scrollTop = newestFirst ? 0 : rows.scrollHeight;
+                        }
                     };
 
                     // batch everything that arrives within one animation frame into a
@@ -384,7 +422,7 @@
                     getId('scrollbtn').onclick = (e) => {
                         autoScroll = !autoScroll;
                         getId('scrollbtn').classList.toggle('on', autoScroll);
-                        if (autoScroll) getId('rc').scrollTop = 0;
+                        if (autoScroll) getId('rc').scrollTop = newestFirst ? 0 : getId('rc').scrollHeight;
                     };
                     document.querySelectorAll('.lvl[data-lvl]').forEach(btn => {
                         btn.onclick = () => {
@@ -397,7 +435,10 @@
 
                     getId('rc').onscroll = (e) => {
                         last_known_scroll_position = e.target.scrollTop;
-                        if (last_known_scroll_position === 0) {
+                        var near_end = newestFirst
+                            ? last_known_scroll_position === 0
+                            : (e.target.scrollHeight - e.target.scrollTop - e.target.clientHeight) < 40;
+                        if (near_end) {
                             autoScroll = true;
                             getId('scrollbtn').classList.add('on');
                             var hidden = document.getElementsByClassName('hide');
@@ -519,13 +560,16 @@
                                     return;
                                 }
                                 // rawlogs is a <div class="logblock">...</div> of <div class="log X">...</div>
+                                // (newest-first, as buffered by the backend)
                                 var block = document.createElement('div');
                                 block.innerHTML = rawlogs;
                                 var logEls = block.getElementsByClassName('log');
                                 var lines = [];
-                                for (var i = 0; i < logEls.length; i++) {
+                                for (var i = logEls.length - 1; i >= 0; i--) {
                                     lines.push(logEls[i].textContent);
                                 }
+                                // pendingLines stays chronological (oldest first);
+                                // flushPending renders it according to the direction
                                 pendingLines = lines.concat(pendingLines);
                                 scheduleFlush();
                             };
