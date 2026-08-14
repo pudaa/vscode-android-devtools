@@ -73,6 +73,8 @@ class LogcatContent {
         //   'mine' = only the current app (default when a package name is known)
         this._packageName = String(options.packageName !== undefined ? options.packageName : AndroidContentProvider.getLaunchConfigSetting('appId', '') || '').trim();
         this._filterMode = options.filterMode || (this._packageName ? 'mine' : 'all');
+        // specific process selected via the toolbar process dropdown ('process' mode)
+        this._processPid = null;
         this._adbclient = new ADBClient(deviceid);
         this._initwait = this.initialise();
         LogcatInstances.set(this._logcatid, this);
@@ -169,15 +171,14 @@ class LogcatContent {
      */
     async buildFilterArgs() {
         const static_filter = (this._filter || '').trim();
-        if (this._filterMode !== 'mine' || !this._packageName) {
-            return static_filter;
+        let pid_args = '';
+        if (this._filterMode === 'mine' && this._packageName) {
+            const pids = await this.getAppPids(this._packageName);
+            pid_args = pids.map(p => `--pid=${p}`).join(' ');
+        } else if (this._filterMode === 'process' && this._processPid) {
+            pid_args = `--pid=${this._processPid}`;
         }
-        const pids = await this.getAppPids(this._packageName);
-        if (!pids.length) {
-            return static_filter;
-        }
-        const pid_args = pids.map(p => `--pid=${p}`).join(' ');
-        return (static_filter + ' ' + pid_args).trim();
+        return pid_args ? (static_filter + ' ' + pid_args).trim() : static_filter;
     }
 
     /**
@@ -209,12 +210,45 @@ class LogcatContent {
             return;
         }
         this._filterMode = mode;
+        this._processPid = null;
         try {
             await this.restartMonitor();
         } catch (err) {
             this._state = 'disconnected';
             this.sendDisconnectMsg();
         }
+    }
+
+    /**
+     * Filter logcat to a single debug process (Android Studio style process picker).
+     * @param {string} pid
+     */
+    async setProcess(pid) {
+        if (!/^\d+$/.test(pid)) {
+            return;
+        }
+        this._filterMode = 'process';
+        this._processPid = pid;
+        try {
+            await this.restartMonitor();
+        } catch (err) {
+            this._state = 'disconnected';
+            this.sendDisconnectMsg();
+        }
+    }
+
+    /**
+     * Send the list of named debuggable processes to the requesting client so the
+     * toolbar process dropdown can be populated.
+     * @param {import('ws').WebSocket} client
+     */
+    async listProcesses(client) {
+        try {
+            const named = await new ADBClient(this._logcatid).named_jdwp_list(2000);
+            if (client && client.readyState === 1) {
+                client.send('!processes:' + JSON.stringify(named.filter(p => p && p.name)));
+            }
+        } catch (e) { /* ignore - dropdown just stays with the fixed options */ }
     }
 
     sendClientMessage(msg) {
@@ -254,6 +288,10 @@ class LogcatContent {
         } else if (message === 'cmd:set_filter:all' || message === 'cmd:set_filter:mine') {
             // package:mine toggle (Android Studio style)
             this.setFilterMode(message === 'cmd:set_filter:mine' ? 'mine' : 'all');
+        } else if (message.startsWith('cmd:set_process:')) {
+            this.setProcess(message.slice('cmd:set_process:'.length));
+        } else if (message === 'cmd:list_processes') {
+            this.listProcesses(client);
         } else if (message === 'cmd:export_logcat') {
             this.exportLogcat();
         }
@@ -331,6 +369,7 @@ class LogcatContent {
             lColMessage: loc('logcat.colMessage', 'Message'),
             lWaitingLogs: loc('logcat.waitingLogs', 'Waiting for logs...'),
             lExport: loc('logcat.export', 'Export logcat'),
+            lProcessTitle: loc('logcat.processTitle', 'Filter by process'),
         }, vars);
         // simple value replacement using !{name} as the placeholder
         const html = this._htmltemplate.replace(/!\{(.*?)\}/g, (match,expr) => ''+(vars[expr.trim()]||''));

@@ -48,9 +48,9 @@
         .act:hover:enabled {color:#fff;}
         .act.on {background:#444;color:#fff;}
         .act:disabled {opacity:.4;cursor:default;}
-        /* filter mode select (all logs / package:mine) */
-        #filtermode {padding:.15em .5em;border:1px solid #444;background:none;color:#aaa;border-radius:4px;cursor:pointer;font-size:.95em;line-height:1.35;background:var(--vscode-input-background);color:var(--vscode-input-foreground);}
-        #filtermode:focus {outline:none;border-color:#4a4;}
+        /* filter mode + process selects (all logs / package:mine / process) */
+        #filtermode, #procselect {padding:.15em .5em;border:1px solid #444;background:none;color:#aaa;border-radius:4px;cursor:pointer;font-size:.95em;line-height:1.35;background:var(--vscode-input-background);color:var(--vscode-input-foreground);}
+        #filtermode:focus, #procselect:focus {outline:none;border-color:#4a4;}
         .vscode-light .act {color:#555;border-color:#bbb;}
         .vscode-light .act:hover:enabled {color:#000;}
         .vscode-light .act.on {background:#ccc;color:#000;}
@@ -109,6 +109,10 @@
                 <select id="filtermode" title="!{lFilterModeTitle}">
                     <option value="all">!{lFilterAll}</option>
                     <option value="mine">!{lFilterMine}</option>
+                </select>
+                <select id="procselect" title="!{lProcessTitle}">
+                    <option value="mine">!{lFilterMine}</option>
+                    <option value="all">!{lFilterAll}</option>
                 </select>
                 <input id="q" placeholder="!{lFilterPlaceholder}" title="!{lFilterTitle}"/>
                 <button id="pausebtn" class="act" title="!{lPause}">⏸</button>
@@ -319,7 +323,20 @@
                     getId('filtermode').value = '!{lFilterMode}';
                     getId('filtermode').onchange = () => {
                         const mode = getId('filtermode').value;
+                        getId('procselect').value = mode;
                         if (ws) ws.send('cmd:set_filter:' + mode);
+                    };
+                    // process selector: package:mine / all logs / a specific debug process
+                    getId('procselect').value = '!{lFilterMode}';
+                    getId('procselect').onchange = () => {
+                        const v = getId('procselect').value;
+                        if (!ws) return;
+                        if (v === 'mine' || v === 'all') {
+                            getId('filtermode').value = v;
+                            ws.send('cmd:set_filter:' + v);
+                        } else if (v.indexOf('proc:') === 0) {
+                            ws.send('cmd:set_process:' + v.slice(5));
+                        }
                     };
                     getId('clearlcbtn').onclick = (e) => {
                         ws && ws.send('cmd:clear_logcat');
@@ -425,6 +442,7 @@
                                 getId('clearlcbtn').disabled = false;
                                 getId('exportbtn').disabled = false;
                                 ws = x;
+                                x.send('cmd:list_processes');
                             };
                             x.onclose = e => {
                                 ws = null;
@@ -449,6 +467,23 @@
                                 }
                                 if (/^:filter_updated$/.test(rawlogs)) {
                                     // the backend restarted the logcat with a new filter mode
+                                    return;
+                                }
+                                if (rawlogs.indexOf('!processes:') === 0) {
+                                    // populate the process dropdown with debuggable processes
+                                    try {
+                                        const list = JSON.parse(rawlogs.slice('!processes:'.length));
+                                        const sel = getId('procselect');
+                                        const cur = sel.value;
+                                        while (sel.options.length > 2) sel.remove(sel.options.length - 1);
+                                        list.forEach(p => {
+                                            const opt = document.createElement('option');
+                                            opt.value = 'proc:' + p.pid;
+                                            opt.textContent = (p.name || ('pid ' + p.pid)) + ' (' + p.pid + ')';
+                                            sel.appendChild(opt);
+                                        });
+                                        sel.value = cur;
+                                    } catch (e) {}
                                     return;
                                 }
                                 // rawlogs is a <div class="logblock">...</div> of <div class="log X">...</div>

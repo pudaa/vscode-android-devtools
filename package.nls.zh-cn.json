@@ -61,5 +61,6 @@
     "logcat.colMessage": "消息",
     "logcat.waitingLogs": "等待日志...",
     "logcat.export": "导出日志",
-    "logcat.exported": "日志已导出到 {0}"
+    "logcat.exported": "日志已导出到 {0}",
+    "logcat.processTitle": "按进程筛选"
 }
