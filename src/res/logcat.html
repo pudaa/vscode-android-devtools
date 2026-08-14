@@ -67,7 +67,7 @@
         .lc .msg {flex:1 1 auto;}
 
         /* ── log rows ── */
-        .log {white-space:nowrap;display:flex;padding:0 .6em;line-height:1.5;font-variant-numeric:tabular-nums;}
+        .log {white-space:nowrap;display:flex;padding:0 .6em;line-height:1.5;font-variant-numeric:tabular-nums;content-visibility:auto;contain-intrinsic-size:1.5em;}
         /* Must win over .log's display:flex (same specificity, defined later),
            otherwise filtered-out rows are counted but still rendered. */
         .log.filter {display:none;}
@@ -79,7 +79,7 @@
         .log .tag {flex:0 0 auto;color:#c9a;padding-right:.8em;max-width:12em;overflow:hidden;text-overflow:ellipsis;}
         .log .msg {flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}
         /* expanded long message: click the message area to expand/collapse */
-        .log.expanded {align-items:flex-start;}
+        .log.expanded {align-items:flex-start;content-visibility:visible;}
         .log.expanded .msg {white-space:normal;word-break:break-word;overflow:visible;height:auto;}
         .log.expanded .tag {white-space:nowrap;}
         .vscode-light .log .t {color:#888;}
@@ -195,6 +195,9 @@
                     var autoScroll = true;
                     var levelFilter = { V:true, D:true, I:true, W:true, E:true, F:true };
                     var pendingLines = [];
+                    // performance: cached visible row count + rAF-batched rendering
+                    var visibleCount = 0;
+                    var rafScheduled = false;
 
                     // Cap the number of rendered log rows so the page doesn't get slower
                     // as logs accumulate (DOM nodes were previously never removed).
@@ -203,7 +206,10 @@
                         var all = rows.getElementsByClassName('log');
                         while (all.length > MAX_LOG_ROWS) {
                             var last = all[all.length - 1];
-                            if (last && last.parentNode) last.parentNode.removeChild(last);
+                            if (last && last.parentNode) {
+                                if (!last.classList.contains('filter')) visibleCount--;
+                                last.parentNode.removeChild(last);
+                            }
                             else break;
                         }
                     };
@@ -248,36 +254,56 @@
 
                     const refreshLevelFilter = () => {
                         const all = rows.getElementsByClassName('log');
-                        for (let i = 0; i < all.length; i++) applyAllFilters(all[i]);
+                        visibleCount = 0;
+                        for (let i = 0; i < all.length; i++) {
+                            if (applyAllFilters(all[i])) visibleCount++;
+                        }
                         updateLogCountDisplay();
                     };
 
                     // combined level + regex filter
                     const applyAllFilters = (row) => {
-                        if (!row) return;
+                        if (!row) return true;
                         const levelVisible = applyLevelToRow(row);
                         let regexVisible = true;
                         if (currfilter) regexVisible = currfilter.test(row._text);
-                        row.classList.toggle('filter', !(levelVisible && regexVisible));
+                        const visible = levelVisible && regexVisible;
+                        row.classList.toggle('filter', !visible);
+                        return visible;
                     };
 
                     // render pending lines (called on data, or when unpaused)
                     const flushPending = () => {
                         if (paused) return;
                         if (!pendingLines.length) return;
-                        // insert newest at the top: iterate pending in order, prepend each
-                        for (let i = 0; i < pendingLines.length; i++) {
+                        // batch-insert via a DocumentFragment so the browser lays out
+                        // once instead of once per row (big win for high log rates)
+                        const frag = document.createDocumentFragment();
+                        // iterate newest-first so the newest line ends up at the top
+                        for (let i = pendingLines.length - 1; i >= 0; i--) {
                             const line = pendingLines[i];
                             const parsed = parseLog(line);
                             const row = buildRow(parsed, line);
-                            applyAllFilters(row);
-                            rows.insertBefore(row, rows.firstChild);
+                            if (applyAllFilters(row)) visibleCount++;
+                            frag.appendChild(row);
                         }
+                        rows.insertBefore(frag, rows.firstChild);
                         logcount += pendingLines.length;
                         pendingLines.length = 0;
                         trimLogRows(rows);
                         updateLogCountDisplay();
                         if (autoScroll) rows.scrollTop = 0;
+                    };
+
+                    // batch everything that arrives within one animation frame into a
+                    // single render pass instead of one DOM update per WebSocket message
+                    const scheduleFlush = () => {
+                        if (paused || rafScheduled) return;
+                        rafScheduled = true;
+                        requestAnimationFrame(() => {
+                            rafScheduled = false;
+                            flushPending();
+                        });
                     };
 
                     const selecttext = (rows) => {
@@ -331,12 +357,7 @@
                     };
 
                     updateLogCountDisplay = () => {
-                        var visible = 0;
-                        const all = rows.getElementsByClassName('log');
-                        for (let i = 0; i < all.length; i++) {
-                            if (!all[i].classList.contains('filter')) visible++;
-                        }
-                        getId('lcount').textContent = '!{lShown}'.replace('{0}', visible).replace('{1}', logcount);
+                        getId('lcount').textContent = '!{lShown}'.replace('{0}', visibleCount).replace('{1}', logcount);
                     };
 
                     showFilterErr = (msg) => {
@@ -353,7 +374,10 @@
                             } catch(err) { return showFilterErr('!{lInvalidRegex}'); }
                         }
                         const logs = rows.getElementsByClassName('log');
-                        for (let i = 0; i < logs.length; i++) applyAllFilters(logs[i]);
+                        visibleCount = 0;
+                        for (let i = 0; i < logs.length; i++) {
+                            if (applyAllFilters(logs[i])) visibleCount++;
+                        }
                         currfilter = newfilter;
                         updateLogCountDisplay();
                     };
@@ -412,6 +436,7 @@
                                 if (/^:logcat_cleared$/.test(rawlogs)) {
                                     rows.innerHTML = '';
                                     logcount = prevlc = 0;
+                                    visibleCount = 0;
                                     if (currfilter) currfilter.matchCounts = {true:0,false:0};
                                     updateLogCountDisplay();
                                     return;
@@ -429,7 +454,7 @@
                                     lines.push(logEls[i].textContent);
                                 }
                                 pendingLines = lines.concat(pendingLines);
-                                if (!paused) flushPending();
+                                scheduleFlush();
                             };
                         } catch(e) { setStatus('Connection exception'); }
                     };
