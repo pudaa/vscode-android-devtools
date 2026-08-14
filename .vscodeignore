@@ -6,3 +6,5 @@ test/**
 jsconfig.json
 vsc-extension-quickstart.md
 .eslintrc.json
+AGENTS.md
+docs/**

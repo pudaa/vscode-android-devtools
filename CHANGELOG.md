@@ -1,16 +1,26 @@
 # Change Log
 
-### version 1.5.0
+### version 1.5.0 (first community release)
 * NEW: Sidebar UI - Android DevTools activity bar with three views (Launch / Logcat / Settings), no more command-palette-only workflow.
-* NEW: Launch view - one-click "Launch + Logcat" and "Launch + Debug", visual config summary, edit launch.json shortcut.
-* NEW: Settings view - visual editor for the android launch config (apkFile, activity, adbSocket, openLogcatAfterLaunch, pm args).
-* NEW: Logcat is now a sidebar view (draggable to bottom panel as a tab) with an IDEA-style toolbar: level filters (V/D/I/W/E/F), pause, auto-scroll lock, regex filter, structured columns (time/level/PID/TID/tag/message).
+* NEW: Launch view - one-click "Launch + Logcat", "Debug Launch" and "Build & Launch Release", visual config summary, edit launch.json shortcut.
+* NEW: Settings view - visual editor for the android launch config (apkFile, activity, adbSocket, openLogcatAfterLaunch, pm args, waitForDebugger, logcatFilter, release gradle task).
+* NEW: Logcat is now a sidebar view (draggable to bottom panel as a tab) with an IDEA-style toolbar: level filters (V/D/I/W/E/F), pause, auto-scroll lock, regex filter, structured columns (time/level/PID/TID/tag/message), draggable column widths, sticky headers.
+* NEW: `package:mine` filter - only show logs from the current app (resolved from `appId` / `launchActivity` / APK manifest), auto-tracking its main & child PIDs via `pidof`.
+* NEW: Process filter - pick a process (PID) to view its logs.
+* NEW: Crash buffer view (`logcat -b crash`).
+* NEW: Export logcat to a file (Save dialog).
+* NEW: Long-message expand/collapse on click + hover tooltip with the full message.
+* NEW: Performance - batched rendering (DocumentFragment + requestAnimationFrame), DOM row cap, `content-visibility` to skip off-screen rendering.
 * NEW: i18n - English + Simplified Chinese (package.nls.json / package.nls.zh-cn.json).
 * NEW: Logcat switched to `-v threadtime` output for PID+TID columns.
 * NEW: `openLogcatAfterLaunch` launch option - install/launch the app and auto-open the logcat panel without attaching the debugger (logcat-only mode). Logcat buffer is cleared first so only this launch's logs are shown.
-* (fork maintenance 1.4.1) Debugger: poll for the target process (30s) instead of a single 10s lookup, so the app reliably re-enters after reinstall/relaunch.
-* (fork maintenance 1.4.1) Logcat: new `logcatFilter` launch option (e.g. `--pid=$(pidof <pkg>)`) to limit device-wide log capture.
-* (fork maintenance 1.4.1) Logcat: cap DOM rows in the webview + narrow backend history cache to keep the panel responsive.
+* NEW: `logcatFilter` launch option (e.g. `--pid=$(pidof <pkg>)`) to limit device-wide log capture.
+* NEW: "Build & Launch Release" - runs `assembleRelease`, maps debug→release APK path, auto uninstall/reinstall on signature conflicts.
+* FIX: Debugger polls for the target process (30s) instead of a single lookup, so the app reliably re-enters after reinstall/relaunch.
+* FIX: Huawei/EMUI real-device debugging - plain launch + attach instead of `-D` wait-for-debugger.
+* FIX: Launch falls back to the manifest launcher activity when the configured activity fails (Permission Denial / not exported / not found).
+* FIX: Logcat performance - cap DOM rows in the webview + narrow backend history cache.
+* FIX: Various logcat UI fixes (column alignment, level filter buttons, drag-to-resize columns).
 
 ### version 1.3.2
 * Update analytics library

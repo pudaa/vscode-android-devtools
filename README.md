@@ -1,19 +1,59 @@
-# Android DevTools for VS Code
+# Android DevTools (Community) for VS Code
 
-> **Fork 声明**
-> 本项目是 [adelphes/android-dev-ext](https://github.com/adelphes/android-dev-ext)(MIT License, Copyright (c) 2017 Dave Holoway)的社区维护分支,在原版 1.4.0 基础上继续修复问题。感谢原作者 Dave Holoway 的开源贡献。
-> 原版权声明见 [LICENSE](LICENSE)。
+> **Fork / 分支声明**
+> 本项目是 [adelphes/android-dev-ext](https://github.com/adelphes/android-dev-ext)（MIT License, Copyright (c) 2017 Dave Holoway）的**社区维护分支**，在原版 1.4.0 基础上持续修复问题并新增功能。感谢原作者 Dave Holoway 的开源贡献，原版权声明见 [LICENSE](LICENSE)。
+>
+> *This project is a community-maintained fork of [adelphes/android-dev-ext](https://github.com/adelphes/android-dev-ext) (MIT License, Copyright (c) 2017 Dave Holoway). We keep fixing bugs and adding features on top of the original 1.4.0. Full license text is in [LICENSE](LICENSE).*
 
-Android 应用的 VS Code 调试扩展(预览版)。基于 JDWP + ADB,支持在 VS Code 环境中安装、启动和调试 Android 应用。
+基于 JDWP + ADB 的 Android 应用调试扩展：在 VS Code 中安装、启动、调试 Android 应用。自带 **IDEA 风格 Logcat 侧边栏**、可视化启动控制与配置面板，界面支持中英文。
 
-## 相对原版的维护更新
+*An Android debugging extension for VS Code, powered by JDWP + ADB. Install, launch and debug your Android apps right in VS Code, with an IDEA-style Logcat sidebar, visual launch controls and a settings panel. The UI is fully localized in English and Simplified Chinese.*
 
-- **新增 (1.5.0)**: `openLogcatAfterLaunch` 启动配置项 —— 只想运行 App 看日志时,按 F5 安装并启动应用后**自动打开 Logcat 面板**,且**不附加调试器**。Logcat 会先被清空,只显示本次启动的日志。
-- **修复 (1.4.1)**: F5 调试时应用更新(覆盖安装)后偶发不自动重新进入 —— 将"一次查询可调试进程"改为"轮询等待目标进程(30s)",兼容冷启动较慢的场景
-- **修复 (1.4.1)**: Logcat 默认采集全部系统日志 —— 新增 `logcatFilter` launch 配置项,支持按 PID/TAG 过滤(如 `--pid=$(pidof com.example.app)`)
-- **修复 (1.4.1)**: Logcat 日志量增大后界面越来越卡 —— 前端限制 DOM 节点上限(2000 行),后端历史缓存收窄
+## 功能特性 / Features
 
-### 使用示例：只看日志（不调试）
+- **逐步调试**：断点、变量查看与修改、异常断点、步进 Android 源码 / *Line-by-line stepping, breakpoints, variable inspection & modification, break on exceptions, step through Android sources*
+- **IDEA 风格 Logcat 侧边栏**（可拖到底部面板）：级别过滤、暂停/继续、自动滚动、正则过滤、结构化列（时间/级别/PID/TID/标签/消息）、可拖拽列宽、固定列头 / *IDEA-style Logcat sidebar: level filters, pause, auto-scroll, regex filter, structured columns (time/level/PID/TID/tag/message), draggable columns, sticky headers*
+- **`package:mine` 只看当前应用**：自动跟踪主/子进程，只显示当前应用的日志 / *package:mine filter - only show logs from the current app, tracking its main & child processes*
+- **进程筛选**：按 PID 选择要查看的进程 / *Filter logs by process (PID)*
+- **崩溃缓冲**：一键查看 `logcat -b crash` / *One-click crash buffer view (`logcat -b crash`)*
+- **导出日志**：将当前 logcat 导出为文件 / *Export logcat to a file*
+- **侧边栏启动视图**：一键「启动并查看日志」「调试启动」「编译并启动 Release」/ *Launch view: one-click "Launch + Logcat", "Debug Launch", "Build & Launch Release"*
+- **侧边栏设置视图**：可视化编辑 `launch.json` / *Settings view: visual editor for launch.json*
+- **`openLogcatAfterLaunch`**：只跑 App 看日志，不附加调试器 / *Run the app & auto-open Logcat without attaching the debugger*
+- **Java 智能提示**（beta）/ *Java Intellisense (beta)*
+- **中英文界面**（i18n）/ *English + Simplified Chinese UI*
+
+## 社区版新增功能（相对原版 1.4.0）/ What's New in This Community Fork
+
+**新增：**
+
+- 侧边栏 UI —— Activity Bar 三个视图（启动 / Logcat / 设置），告别纯命令面板工作流
+- Logcat 侧边栏视图 + IDEA 风格工具栏（级别过滤 / 暂停 / 自动滚动 / 正则过滤 / 结构化列 / 可拖拽列宽 / 固定列头）
+- i18n —— 英文 + 简体中文界面
+- Logcat 切换为 `-v threadtime` 输出，显示 PID / TID 列
+- `openLogcatAfterLaunch` 启动配置 —— 启动后自动打开 Logcat 面板且不附加调试器（先清空缓冲，只显示本次启动日志）
+- `logcatFilter` 启动配置 —— 限制全设备日志采集范围（如 `--pid=$(pidof <pkg>)`）
+- `package:mine` 过滤 —— 只显示当前应用的日志（对标 Android Studio）
+- 进程筛选器 —— 选择要查看的进程日志
+- 崩溃缓冲视图（`logcat -b crash`）
+- 导出 Logcat 到文件
+- 大规模日志渲染性能优化（DOM 上限 + 批量渲染 + 屏外跳过）
+- 「编译并启动 Release」命令（自动映射 debug→release APK 路径，签名冲突自动重装）
+
+**修复：**
+
+- 调试器 attach 改为轮询等待目标进程（30s），覆盖安装 / 冷启动后可靠重连
+- Logcat 渲染卡顿 —— 限制 DOM 节点上限（2000 行）+ 收窄后端历史缓存
+- 华为 / EMUI 真机调试兼容（普通启动 + attach 替代 `-D` 等待调试器）
+- 启动失败时自动用 manifest 的 launcher activity 回退重试
+
+## 快速上手 / Quick Start
+
+1. 先构建出 APK（本扩展不负责构建，可用 `preLaunchTask` 自动构建，见下文）；
+2. 在 `launch.json` 中添加 Android 启动配置（见下文示例）；
+3. 按 F5 调试，或打开侧边栏「启动」视图一键启动。
+
+### 只看日志（不调试）/ Run the App & View Logcat (no debugging)
 
 在 `launch.json` 的 Android 启动配置中加一行：
 
@@ -29,21 +69,15 @@ Android 应用的 VS Code 调试扩展(预览版)。基于 JDWP + ADB,支持在 
 
 按 F5 后：构建 → 安装 APK → 清空 logcat → 启动应用 → 自动打开 Logcat 面板（不进入调试模式）。
 
-## What's New
-- Java Intellisense for Android is now in beta.
+*Press F5: build → install APK → clear logcat → launch the app → auto-open the Logcat panel (no debugger attached).*
 
-## Features
-* Line by line code stepping
-* Breakpoints
-* Variable inspection and modification
-* Logcat viewing [ Command Palette -> Android: View Logcat ]
-* Break on exceptions
-* Step through Android sources
-
-## Requirements
+## Requirements / 环境要求
 
 You must have [Android SDK Platform Tools](https://developer.android.com/studio/releases/platform-tools.html) installed. This extension communicates with your device via the ADB (Android Debug Bridge) interface.  
 > You are not required to have Android Studio installed - if you have Android Studio installed, make sure there are no active instances of it when using this extension or you may run into problems with ADB.
+
+需要安装 [Android SDK Platform Tools](https://developer.android.com/studio/releases/platform-tools.html)，扩展通过 ADB（Android Debug Bridge）与设备通信。
+> 无需安装 Android Studio；若已安装，使用本扩展时请确保没有正在运行的 Android Studio 实例，否则可能与 ADB 冲突。
 
 ## Limitations
 
@@ -54,10 +88,12 @@ If you use gradle (or Android Studio), you can build your app from the command-l
 * Some debugger options are yet to be implemented. You cannot set conditional breakpoints and watch expressions must be simple variables.
 * If you require a must-have feature that isn't there yet, let us know on [GitHub](https://github.com/adelphes/android-dev-ext/issues).  
 
-## Extension Settings
+## Extension Settings / 启动配置
 
 This extension allows you to debug your App by creating a new Android configuration in `launch.json`.  
 The following settings are used to configure the debugger:
+
+本扩展通过在 `launch.json` 中创建 Android 启动配置来调试应用，常用配置项说明如下：
 ```jsonc
     {
         "version": "0.2.0",
@@ -221,19 +257,16 @@ arr,x            int[3]
 Note: Format specifiers for floating point values (`e`/`g`) and string encoding conversions (`s8`/`su`/`s32`) are not supported.
 
 
-## Powered by coffee
+## 许可证与致谢 / License & Credits
 
-The Android Developer Extension is a completely free, fully open-source project. If you've found the extension useful, you
-can support it by [buying me a coffee](https://www.buymeacoffee.com/adelphes).
+本项目基于 [adelphes/android-dev-ext](https://github.com/adelphes/android-dev-ext) fork，遵循 **MIT License**，原版权归 Copyright (c) 2017 Dave Holoway 所有，完整协议见 [LICENSE](LICENSE)。感谢原作者 Dave Holoway 创作并开源了这款优秀的扩展。本社区版由 [Chenxin](https://github.com/pudaa) 维护。
 
-If you use ApplePay or Google Pay, you can scan the code with your phone camera:
+*This project is a community-maintained fork of [adelphes/android-dev-ext](https://github.com/adelphes/android-dev-ext) under the MIT License (Copyright (c) 2017 Dave Holoway). Thanks to the original author Dave Holoway for creating the extension. Maintained by [Chenxin](https://github.com/pudaa).*
 
-![BuyMeACoffee Code](https://raw.githubusercontent.com/adelphes/android-dev-ext/master/images/bmac-code.png)
+## Questions / Problems / 问题反馈
 
-Every coffee makes a difference, so thanks for adding your support.
+If you run into any problems, please open an issue on [GitHub](https://github.com/pudaa/vscode-android-devtools/issues).
 
-## Questions / Problems
+遇到问题请在 [GitHub Issues](https://github.com/pudaa/vscode-android-devtools/issues) 反馈。
 
-If you run into any problems, tell us on [GitHub](https://github.com/adelphes/android-dev-ext/issues) or contact me on [Twitter](https://twitter.com/daveholoway).
-
-![Launch Android App](https://raw.githubusercontent.com/adelphes/android-dev-ext/master/images/demo.gif)
+![Launch Android App](https://raw.githubusercontent.com/pudaa/vscode-android-devtools/master/images/demo.gif)

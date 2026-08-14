@@ -1,10 +1,10 @@
 {
     "name": "vscode-android-devtools",
-    "displayName": "Android DevTools",
-    "description": "Android debugging support for VS Code (community-maintained fork of android-dev-ext)",
+    "displayName": "Android DevTools (Community)",
+    "description": "Android debugging support for VS Code (JDWP + ADB). IDEA-style Logcat sidebar, launch & settings views, i18n (en/zh-cn). Community-maintained fork of android-dev-ext.",
     "version": "1.5.0",
     "publisher": "pudaa",
-    "preview": true,
+    "author": "Chenxin",
     "license": "MIT",
     "engines": {
         "vscode": "^1.24.0"
