@@ -80,6 +80,30 @@ async function ensureInstalled(adb, info, pmInstallArgs) {
 }
 
 /**
+ * Run the launch.json preLaunchTask (e.g. "run gradle") and wait for it to finish,
+ * so the APK is built before we install & launch. No-op if none is configured or
+ * the task infrastructure is unavailable.
+ * @param {string|undefined} taskName
+ */
+async function runPreLaunchTask(taskName) {
+    if (!taskName) return;
+    try {
+        const tasks = await vscode.tasks.fetchTasks();
+        const task = tasks.find(t => t.name === taskName || t.label === taskName);
+        if (!task) return;
+        await new Promise((resolve) => {
+            const sub = vscode.tasks.onDidEndTaskProcess(e => {
+                if (e.execution && e.execution.task === task) {
+                    sub.dispose();
+                    resolve();
+                }
+            });
+            vscode.tasks.executeTask(task);
+        });
+    } catch (e) { /* task infrastructure unavailable - continue anyway */ }
+}
+
+/**
  * Start the app on a device and open the sidebar Logcat view. Fully independent
  * of the VS Code debug session.
  */
@@ -91,6 +115,8 @@ async function launchAppAndOpenLogcat() {
             vscode.window.showErrorMessage(i18n.localize('launch.noApk', 'No apkFile configured in launch.json'));
             return;
         }
+        // build first (e.g. "run gradle") so the APK is up to date
+        await runPreLaunchTask(cfg.preLaunchTask);
         const info = await APKFileInfo.from({ apkFile });
 
         if (!(await checkADBStarted(cfg.autoStartADB !== false))) {
@@ -124,4 +150,5 @@ async function launchAppAndOpenLogcat() {
 module.exports = {
     launchAppAndOpenLogcat,
     pickLaunchActivity,
+    runPreLaunchTask,
 };

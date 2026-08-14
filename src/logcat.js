@@ -75,6 +75,8 @@ class LogcatContent {
         this._filterMode = options.filterMode || (this._packageName ? 'mine' : 'all');
         // specific process selected via the toolbar process dropdown ('process' mode)
         this._processPid = null;
+        // pending poll timer for package:mine auto-recovery (app not running yet)
+        this._pidRetryTimer = null;
         this._adbclient = new ADBClient(deviceid);
         this._initwait = this.initialise();
         LogcatInstances.set(this._logcatid, this);
@@ -174,15 +176,45 @@ class LogcatContent {
         let pid_args = '';
         if (this._filterMode === 'mine' && this._packageName) {
             const pids = await this.getAppPids(this._packageName);
-            // If the app isn't running there are no PIDs: use -s (silent) so we show
-            // nothing instead of falling back to the whole device (matches Android
-            // Studio's package:mine behaviour). Note: --pid=0 is rejected by some
-            // devices ("pid 0 out of range" + a usage dump).
-            pid_args = pids.length ? pids.map(p => `--pid=${p}`).join(' ') : '-s';
+            if (pids.length) {
+                // app is running - cancel any pending retry and filter by pid
+                this.schedulePidRetry(false);
+                pid_args = pids.map(p => `--pid=${p}`).join(' ');
+            } else {
+                // app not running yet: stay silent (-s) but keep polling so the
+                // logcat starts streaming automatically once the app comes up
+                this.schedulePidRetry(true);
+                pid_args = '-s';
+            }
         } else if (this._filterMode === 'process' && this._processPid) {
             pid_args = `--pid=${this._processPid}`;
         }
         return pid_args ? (static_filter + ' ' + pid_args).trim() : static_filter;
+    }
+
+    /**
+     * Schedule (or cancel) a poll that restarts the monitor once the app process
+     * appears, so package:mine stops being silent automatically.
+     * @param {boolean} need true = app not running, keep polling
+     */
+    schedulePidRetry(need) {
+        if (this._pidRetryTimer) {
+            clearTimeout(this._pidRetryTimer);
+            this._pidRetryTimer = null;
+        }
+        if (!need) return;
+        this._pidRetryTimer = setTimeout(async () => {
+            this._pidRetryTimer = null;
+            if (this._filterMode !== 'mine') return;
+            const pids = await this.getAppPids(this._packageName);
+            if (pids.length) {
+                try {
+                    await this.restartMonitor();
+                } catch (e) { /* keep silent until the next poll */ }
+            } else {
+                this.schedulePidRetry(true);
+            }
+        }, 3000);
     }
 
     /**
