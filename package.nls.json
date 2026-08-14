@@ -67,6 +67,8 @@
     "logcat.exported": "Logcat exported to {0}",
     "logcat.processTitle": "Filter logs",
     "logcat.columns": "Columns",
+    "logcat.procStarted": "── Package {0} process started ({1}) ──",
+    "logcat.procExited": "── Package {0} process exited ({1}) ──",
     "launch.noApk": "No apkFile configured in launch.json",
     "launch.apkMissing": "APK not found: {0}",
     "launch.building": "Building APK ({0})...",

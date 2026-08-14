@@ -67,6 +67,8 @@
     "logcat.exported": "日志已导出到 {0}",
     "logcat.processTitle": "过滤日志",
     "logcat.columns": "列",
+    "logcat.procStarted": "── 软件包 {0} 的进程已开始（{1}）──",
+    "logcat.procExited": "── 软件包 {0} 的进程已退出（{1}）──",
     "launch.noApk": "launch.json 中未配置 apkFile",
     "launch.apkMissing": "未找到 APK：{0}",
     "launch.building": "正在编译 APK（{0}）...",

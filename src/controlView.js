@@ -71,29 +71,8 @@ class LaunchViewProvider {
     }
 
     /**
-     * Run the app and auto-open logcat, without entering debug mode.
-     * It launches the currently selected android launch config (debug session)
-     * with openLogcatAfterLaunch forced on by temporarily editing? -> simpler:
-     * we execute the F5 launch; if the config has openLogcatAfterLaunch it will
-     * behave as logcat-only. If not, we fall back to openLogcatWindow after start.
+     * Open launch.json in the editor (create a default one if missing).
      */
-    async launchWithLogcat() {
-        const config = getAndroidLaunchConfig();
-        if (!config) {
-            vscode.window.showErrorMessage(i18n.localize('logcat.launchFailed', 'No Android launch configuration found. Add one in launch.json first.'));
-            return;
-        }
-        if (config.openLogcatAfterLaunch) {
-            // config already handles it
-            await vscode.commands.executeCommand('workbench.action.debug.start');
-        } else {
-            // launch, then open logcat panel manually
-            await vscode.commands.executeCommand('workbench.action.debug.start');
-            // give the app a moment to start, then open logcat
-            setTimeout(() => openLogcatWindow(vscode), 1500);
-        }
-    }
-
     async openLaunchJson() {
         const folders = vscode.workspace.workspaceFolders;
         if (!folders) return;

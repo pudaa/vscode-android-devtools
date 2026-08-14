@@ -176,12 +176,12 @@ class LogcatContent {
 
     /**
      * Build the effective logcat filter arguments for the current filter mode.
-     * 'mine' => '--pid=<app pids...>' (package:mine, like Android Studio),
-     * merged with any static logcatFilter from launch.json.
-     * When the app is not running yet, fall back to NO pid filter (full device
-     * log) instead of '-s' (silent) - '-s' with no tag matches shows only the
-     * "beginning of main/system" markers and nothing else, which looks broken.
-     * The pid poll then restarts the monitor automatically once the app starts.
+     * 'mine' (package:mine, like Android Studio) streams the FULL device log
+     * and filters lines in onLogcatContent: every line from the app's processes
+     * plus lines from other processes (system_server etc.) whose message
+     * mentions the app package - exactly how Android Studio shows activity and
+     * window lifecycle events. A static logcatFilter from launch.json is still
+     * appended. When the app is not running, everything is shown.
      * @returns {Promise<string>}
      */
     async buildFilterArgs() {
@@ -190,10 +190,10 @@ class LogcatContent {
         if (this._filterMode === 'mine' && this._packageName) {
             const pids = await this.getAppPids(this._packageName);
             if (pids.length) {
-                // app is running - cancel any pending retry and filter by pid
+                // app is running - track its pids (used by onLogcatContent to
+                // keep app lines + package-related system lines)
                 this.schedulePidRetry(true);
                 this._activePids = pids;
-                pid_args = pids.map(p => `--pid=${p}`).join(' ');
             } else {
                 // app not running yet: show everything for now, but keep polling
                 // so the filter switches to package:mine once the app comes up
@@ -236,6 +236,12 @@ class LogcatContent {
                     // refreshes _activePids via buildFilterArgs and reschedules
                     // this poll itself.
                     await this.restartMonitor();
+                    // Android Studio style process lifecycle separator
+                    if (pids.length) {
+                        this.sendClientMessage(':procsep:' + loc('logcat.procStarted', '── Package {0} process started ({1}) ──', this._packageName, pids.join(', ')));
+                    } else if (current_pids) {
+                        this.sendClientMessage(':procsep:' + loc('logcat.procExited', '── Package {0} process exited ({1}) ──', this._packageName, current_pids));
+                    }
                 }
             } catch (e) { /* keep polling */ }
             // ALWAYS keep the poll alive while in package:mine mode - a stable
@@ -493,10 +499,29 @@ class LogcatContent {
         if (e.logs.length) {
             const mrlast = e.logs.slice();
             this._logs = this._logs.concat(mrlast);
+            // package:mine (Android Studio style): keep every line from the
+            // app's processes, plus lines from OTHER processes (system_server
+            // etc.) whose message mentions the app package (activity/window
+            // lifecycle events). Only applies when the app is running and the
+            // pids are known.
+            const filter_mine = this._filterMode === 'mine' && this._packageName && this._activePids.length > 0;
             mrlast.forEach(log => {
                 if (!(log = log.trim())) return;
+                if (filter_mine) {
+                    // threadtime: "MM-DD HH:MM:SS.mmm PID TID LEVEL TAG: message"
+                    // (TAG is right-aligned, so it may be followed by spaces
+                    //  before the colon)
+                    const pm = log.match(/^\d\d-\d\d\s+\d\d:\d\d:\d\d\.\d+\s+(\d+)\s+\d+\s+\S\s+(\S+?)\s*:\s?(.*)$/);
+                    if (pm) {
+                        const line_pid = pm[1];
+                        const line_msg = pm[3];
+                        if (!this._activePids.includes(line_pid) && !line_msg.includes(this._packageName)) {
+                            return; // unrelated system line - drop it
+                        }
+                    }
+                }
                 // replace html-interpreted chars
-                const m = log.match(/^\d\d-\d\d\s+?\d\d:\d\d:\d\d\.\d+?\s+?(.)/);
+                const m = log.match(/^\d\d-\d\d\s+\d\d:\d\d:\d\d\.\d+\s+\d+\s+\d+\s+(\S)\s+\S+\s*:/);
                 const style = (m && m[1]) || '';
                 log = log.replace(/[&"'<>]/g, c => ({ '&': '&amp;', '"': '&quot;', "'": '&#39;', '<': '&lt;', '>': '&gt;' }[c]));
                 this._htmllogs.unshift(`<div class="log ${style}">${log}</div>`);
@@ -589,37 +614,6 @@ function onWebSocketClientConnection(client, req) {
 
     // try and make sure we don't delay writes
     client._socket && typeof(client._socket.setNoDelay)==='function' && client._socket.setNoDelay(true);
-}
-
-/**
- * DEPRECATED: the sidebar Logcat view (android-devtools.logcat) is used instead
- * of a separate webview panel. Kept only for reference.
- * @param {import('vscode')} vscode 
- * @param {*} target_device 
- */
-function openWebviewLogcatWindow(vscode, target_device) {
-    const panel = vscode.window.createWebviewPanel(
-        'androidlogcat', // Identifies the type of the webview. Used internally
-        `logcat-${target_device.serial}`, // Title of the panel displayed to the user
-        vscode.ViewColumn.Two, // Editor column to show the new webview panel in.
-        {
-            enableScripts: true,    // we use embedded scripts to relay logcat info over a websocket
-        }
-    );
-    const logcat = new LogcatContent(target_device.serial);
-    logcat.content().then(html => {
-        panel.webview.html = html;
-    });
-}
-
-/**
- * DEPRECATED: legacy previewHtml fallback - kept only for reference.
- * @param {import('vscode')} vscode 
- * @param {*} target_device 
- */
-function openPreviewHtmlLogcatWindow(vscode, target_device) {
-    const uri = AndroidContentProvider.getReadLogcatUri(target_device.serial);
-    vscode.commands.executeCommand("vscode.previewHtml", uri, vscode.ViewColumn.Two);
 }
 
 /**

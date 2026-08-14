@@ -100,6 +100,10 @@
         /* ── empty state ── */
         #rows:empty::before {content:'!{lWaitingLogs}';display:block;padding:.8em .6em;opacity:.5;font-size:.95em;}
 
+        /* ── process lifecycle separator (Android Studio style) ── */
+        .procsep {text-align:center;color:var(--vscode-descriptionForeground,#8a8);padding:.25em .6em;font-size:.9em;user-select:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+        .vscode-light .procsep {color:#488;}
+
         /* ── status / count ── */
         #lcount {font-family:var(--vscode-font-family);font-size:.9em;margin-top:.3em;color:#6a6;font-variant-numeric:tabular-nums;}
         .vscode-light #lcount {color:#373;}
@@ -528,6 +532,15 @@
                             x.onmessage = e => {
                                 if (!rows) return;
                                 var rawlogs = e.data.trim();
+                                if (rawlogs.indexOf(':procsep:') === 0) {
+                                    // Android Studio style process lifecycle separator
+                                    const sep = document.createElement('div');
+                                    sep.className = 'procsep';
+                                    sep.textContent = rawlogs.slice(':procsep:'.length);
+                                    if (newestFirst) rows.insertBefore(sep, rows.firstChild);
+                                    else rows.appendChild(sep);
+                                    return;
+                                }
                                 if (/^:disconnect$/.test(rawlogs)) {
                                     x.close(); setStatus('Device disconnected');
                                     return;

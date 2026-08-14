@@ -49,11 +49,6 @@ async function getAppPackageName() {
 }
 
 /**
- * @type {Map<string, LogcatContent>}
- */
-const viewInstances = new Map();
-
-/**
  * @type {string|null} device serial currently attached to the view
  */
 let currentDevice = null;
