@@ -156,12 +156,15 @@ class LogcatContent {
     /**
      * Retrieve the PIDs belonging to the given package. There may be several (the
      * main process plus ':webview', ':remote' etc. child processes).
+     * Uses a THROWAWAY ADBClient: this._adbclient holds the long-lived logcat
+     * stream socket, so reusing it here (e.g. from the pid poll) would reset
+     * the socket and kill the logcat stream.
      * @param {string} pkg
      * @returns {Promise<string[]>}
      */
     async getAppPids(pkg) {
         try {
-            const out = await this._adbclient.shell_cmd({ command: `pidof ${pkg}`, untilclosed: true }, 8000);
+            const out = await new ADBClient(this._logcatid).shell_cmd({ command: `pidof ${pkg}`, untilclosed: true }, 8000);
             return String(out).trim().split(/\s+/).filter(x => x && /^\d+$/.test(x));
         } catch (e) {
             return [];
