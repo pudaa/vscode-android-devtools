@@ -438,7 +438,13 @@ class AndroidDebugSession extends DebugSession {
 
             // - tell the client we're initialised and ready for breakpoint info, etc
             this.sendEvent(new InitializedEvent());
-            await new Promise(resolve => this.waitForConfigurationDone = resolve);
+            // Wait for the client's configurationDone, but NEVER block resume forever:
+            // if the client never sends it (broken/stopped session), resume anyway so
+            // the app does not hang on "waiting for debugger".
+            await Promise.race([
+                new Promise(resolve => this.waitForConfigurationDone = resolve),
+                new Promise(resolve => setTimeout(resolve, 10000)),
+            ]);
 
             // get the debugger to tell us about any thread creations/terminations
             await this.dbgr.setThreadNotify();
@@ -653,7 +659,13 @@ class AndroidDebugSession extends DebugSession {
 
             // - tell the client we're initialised and ready for breakpoint info, etc
             this.sendEvent(new InitializedEvent());
-            await new Promise(resolve => this.waitForConfigurationDone = resolve);
+            // Wait for the client's configurationDone, but NEVER block resume forever:
+            // if the client never sends it (broken/stopped session), resume anyway so
+            // the app does not hang on "waiting for debugger".
+            await Promise.race([
+                new Promise(resolve => this.waitForConfigurationDone = resolve),
+                new Promise(resolve => setTimeout(resolve, 10000)),
+            ]);
 
             // get the debugger to tell us about any thread creations/terminations
             await this.dbgr.setThreadNotify();
