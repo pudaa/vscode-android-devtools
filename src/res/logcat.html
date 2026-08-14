@@ -64,16 +64,19 @@
         .vscode-high-contrast .act.on {background:#0cc;color:#000;}
 
         /* ── column widths: shared by header and rows via CSS variables so
-           they ALWAYS align (dragging a handle updates the variable) ── */
-        #rc {--col-t:10.5em; --col-lvl:1.4em; --col-pid:4.5em; --col-tid:4.5em; --col-tag:auto;}
+           they ALWAYS align (dragging a handle updates the variable) ──
+           --col-lvl is 2em so the header label ("Lvl"/"级别") fits fully;
+           every header cell clips its text so wide labels can never push
+           the neighbouring columns out of alignment. */
+        #rc {--col-t:10.5em; --col-lvl:2em; --col-pid:4.5em; --col-tid:4.5em; --col-tag:auto;}
         /* ── column header (sticky, aligned with the rows below) ── */
         .lc {display:flex;align-items:center;position:sticky;top:0;z-index:2;padding:0 .6em;line-height:1.9;opacity:.9;background:var(--vscode-sideBar-background);border-bottom:1px solid rgba(128,128,128,.25);user-select:none;}
-        .lc .t {flex:0 0 var(--col-t);padding-right:.8em;font-variant-numeric:tabular-nums;text-align:center;position:relative;}
-        .lc .lvl {flex:0 0 var(--col-lvl);text-align:center;}
-        .lc .pid {flex:0 0 var(--col-pid);padding-right:.8em;font-variant-numeric:tabular-nums;text-align:center;position:relative;}
-        .lc .tid {flex:0 0 var(--col-tid);padding-right:.8em;font-variant-numeric:tabular-nums;text-align:center;position:relative;}
-        .lc .tag {flex:0 0 var(--col-tag);max-width:var(--col-tag-max,12em);overflow:hidden;text-overflow:ellipsis;padding-right:.8em;text-align:center;position:relative;}
-        .lc .msg {flex:1 1 auto;text-align:center;}
+        .lc .t {flex:0 0 var(--col-t);padding-right:.8em;font-variant-numeric:tabular-nums;text-align:center;position:relative;overflow:hidden;white-space:nowrap;}
+        .lc .lvl {flex:0 0 var(--col-lvl);text-align:center;overflow:hidden;white-space:nowrap;}
+        .lc .pid {flex:0 0 var(--col-pid);padding-right:.8em;font-variant-numeric:tabular-nums;text-align:center;position:relative;overflow:hidden;white-space:nowrap;}
+        .lc .tid {flex:0 0 var(--col-tid);padding-right:.8em;font-variant-numeric:tabular-nums;text-align:center;position:relative;overflow:hidden;white-space:nowrap;}
+        .lc .tag {flex:0 0 var(--col-tag);max-width:var(--col-tag-max,12em);overflow:hidden;text-overflow:ellipsis;padding-right:.8em;text-align:center;position:relative;white-space:nowrap;}
+        .lc .msg {flex:1 1 auto;text-align:center;overflow:hidden;white-space:nowrap;}
         /* column resize handle (drag to resize, double-click to reset).
            sits inside the header cell's right padding so overflow:hidden
            (tag column) cannot clip it */
@@ -90,8 +93,8 @@
         /* inherit the level color from the row (the toolbar .lvl buttons share
            this class and force a grey color; specificity + inherit fixes it) */
         .log .lvl {flex:0 0 var(--col-lvl);border:none;padding:0;text-align:center;font-weight:bold;color:inherit;}
-        .log .pid {flex:0 0 var(--col-pid);color:#6a9;padding-right:.8em;}
-        .log .tid {flex:0 0 var(--col-tid);color:#698;padding-right:.8em;}
+        .log .pid {flex:0 0 var(--col-pid);color:#6a9;padding-right:.8em;text-align:center;}
+        .log .tid {flex:0 0 var(--col-tid);color:#698;padding-right:.8em;text-align:center;}
         .log .tag {flex:0 0 var(--col-tag);color:#c9a;padding-right:.8em;max-width:var(--col-tag-max,12em);overflow:hidden;text-overflow:ellipsis;}
         .log .msg {flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}
         /* expanded long message: click the message area to expand/collapse */
