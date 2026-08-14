@@ -4,6 +4,7 @@
     "view.logcat.name": "Logcat",
     "view.settings.name": "Settings",
     "command.view_logcat": "Android: View Logcat",
+    "command.launch_app": "Android: Launch App & View Logcat",
     "command.pick_device": "Android: Pick Device",
     "command.pick_process": "Android: Pick Process",
     "control.config": "Android App",
@@ -63,5 +64,9 @@
     "logcat.export": "Export logcat",
     "logcat.exported": "Logcat exported to {0}",
     "logcat.processTitle": "Filter logs",
-    "logcat.columns": "Columns"
+    "logcat.columns": "Columns",
+    "launch.noApk": "No apkFile configured in launch.json",
+    "launch.adbFailed": "ADB server could not be started. Set ANDROID_HOME or add adb to PATH.",
+    "launch.startFailed": "Failed to start the app: {0}",
+    "launch.failed": "Launch failed: {0}"
 }

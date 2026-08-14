@@ -50,7 +50,8 @@ class LaunchViewProvider {
                     webviewView.webview.html = this.render();
                     break;
                 case 'launch-logcat':
-                    await this.launchWithLogcat();
+                    // install + launch + open logcat - independent of the debug session
+                    await vscode.commands.executeCommand('android-dev-ext.launchApp');
                     break;
                 case 'launch-debug':
                     await vscode.commands.executeCommand('workbench.action.debug.start');

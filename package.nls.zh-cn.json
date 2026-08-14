@@ -4,6 +4,7 @@
     "view.logcat.name": "日志",
     "view.settings.name": "设置",
     "command.view_logcat": "Android: 查看 Logcat",
+    "command.launch_app": "Android: 启动应用并查看日志",
     "command.pick_device": "Android: 选择设备",
     "command.pick_process": "Android: 选择进程",
     "control.config": "Android 应用",
@@ -63,5 +64,9 @@
     "logcat.export": "导出日志",
     "logcat.exported": "日志已导出到 {0}",
     "logcat.processTitle": "过滤日志",
-    "logcat.columns": "列"
+    "logcat.columns": "列",
+    "launch.noApk": "launch.json 中未配置 apkFile",
+    "launch.adbFailed": "无法启动 ADB 服务，请设置 ANDROID_HOME 或将 adb 添加到 PATH。",
+    "launch.startFailed": "启动应用失败：{0}",
+    "launch.failed": "启动失败：{0}"
 }

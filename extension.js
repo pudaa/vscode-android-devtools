@@ -10,6 +10,7 @@ const { openLogcatWindow } = require('./src/logcat');
 const { LogcatViewProvider } = require('./src/logcatView');
 const { LaunchViewProvider } = require('./src/controlView');
 const { SettingsViewProvider } = require('./src/settingsView');
+const { launchAppAndOpenLogcat } = require('./src/launchApp');
 const i18n = require('./src/i18n');
 const { selectAndroidProcessID } = require('./src/process-attach');
 const { selectTargetDevice } = require('./src/utils/device');
@@ -195,6 +196,8 @@ function activate(context) {
             vscode.commands.registerCommand('android-dev-ext.view_logcat', () => {
                 openLogcatWindow(vscode);
             }),
+            // install + launch the app + open logcat - independent of the debug session
+            vscode.commands.registerCommand('android-dev-ext.launchApp', () => launchAppAndOpenLogcat()),
             vscode.commands.registerCommand('PickAndroidDevice', async (launchConfig) => {
                 // if the config has both PickAndroidDevice and PickAndroidProcess, ignore this
                 // request as PickAndroidProcess already includes chooosing a device...

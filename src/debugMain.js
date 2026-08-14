@@ -631,7 +631,9 @@ class AndroidDebugSession extends DebugSession {
                 // 通知扩展自动打开 logcat 面板
                 this.sendEvent(new Event('androiddevtools.openLogcat', {}));
                 this.sendResponse(response);
-                this.sendEvent(new TerminatedEvent(true));
+                // restart must be false, otherwise VS Code auto-restarts the debug
+                // session -> infinite "Checking build / Launching / restart" loop.
+                this.sendEvent(new TerminatedEvent(false));
                 return;
             }
 

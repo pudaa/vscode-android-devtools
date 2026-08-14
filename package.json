@@ -24,6 +24,7 @@
     "activationEvents": [
         "onStartupFinished",
         "onCommand:android-dev-ext.view_logcat",
+        "onCommand:android-dev-ext.launchApp",
         "onCommand:PickAndroidDevice",
         "onCommand:PickAndroidProcess",
         "onView:android-devtools.launch",
@@ -257,6 +258,10 @@
             {
                 "command": "android-dev-ext.view_logcat",
                 "title": "%command.view_logcat%"
+            },
+            {
+                "command": "android-dev-ext.launchApp",
+                "title": "%command.launch_app%"
             },
             {
                 "command": "PickAndroidDevice",
