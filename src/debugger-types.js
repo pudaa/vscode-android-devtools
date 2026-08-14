@@ -34,6 +34,13 @@ class LaunchBuildInfo extends BuildInfo {
             '-c android.intent.category.LAUNCHER',
             `-n ${pkgname}/${launchActivity}`,
         ];
+        /**
+         * If set, and the configured launch activity fails to start (e.g. it is not
+         * exported), the debugger retries with this activity (normally the manifest
+         * launcher). Populated by debugMain.js.
+         * @type {string}
+         */
+        this.fallbackLaunchActivity = '';
         /** 
          * the amount of time (in millis) to wait after 'am start ...' is invoked.
          * We need this because invoking JDWP too soon causes a hang.

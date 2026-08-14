@@ -88,7 +88,8 @@ class Debugger extends EventEmitter {
             throw new Error('startDebugSession: session already active');
         }
         this.session = new DebugSession(build, deviceid);
-        const stdout = await Debugger.runApp(deviceid, build.startCommandArgs, build.postLaunchPause);
+        const fallback_args = this.getLauncherFallbackArgs(build);
+        const stdout = await Debugger.runApp(deviceid, build.startCommandArgs, build.postLaunchPause, fallback_args);
 
         // 轮询等待目标进程出现（刚覆盖安装后的冷启动可能较慢），
         // 避免"应用启动了但调试器没 attach 上"导致的退出/不进入
@@ -155,9 +156,27 @@ class Debugger extends EventEmitter {
         // Logcat-only mode: strip '-D' (wait-for-debugger) so the app starts
         // normally instead of hanging on "waiting for debugger" with no debugger
         // ever attaching. The default startCommandArgs always includes '-D'.
-        const args = (build.startCommandArgs || []).filter(a => String(a).trim() !== '-D');
+        const stripD = arr => (arr || []).filter(a => String(a).trim() !== '-D');
+        const args = stripD(build.startCommandArgs);
+        const fallback_args = this.getLauncherFallbackArgs(build);
         // run 'am start' only - do not scan for JDWP processes or connect
-        return Debugger.runApp(deviceid, args, build.postLaunchPause);
+        return Debugger.runApp(deviceid, args, build.postLaunchPause, fallback_args ? stripD(fallback_args) : null);
+    }
+
+    /**
+     * Build fallback `am start` args that point at the manifest launcher activity,
+     * used when the configured launchActivity fails to start (e.g. it exists but is
+     * not exported, or no longer exists).
+     * @param {LaunchBuildInfo} build
+     * @returns {string[]|null}
+     */
+    getLauncherFallbackArgs(build) {
+        if (!build || !build.fallbackLaunchActivity || !build.pkgname) {
+            return null;
+        }
+        return (build.startCommandArgs || []).map(a =>
+            /^-n\s/.test(a) ? `-n ${build.pkgname}/${build.fallbackLaunchActivity}` : a
+        );
     }
 
     /**
@@ -179,12 +198,13 @@ class Debugger extends EventEmitter {
      * @param {string[]} launch_cmd_args Array of arguments to pass to 'am start'
      * @param {number} post_launch_pause amount of time (in ms) to wait after each launch attempt
      */
-    static async runApp(deviceid, launch_cmd_args, post_launch_pause) {
+    static async runApp(deviceid, launch_cmd_args, post_launch_pause, fallback_cmd_args) {
         // older (<3) versions of Android only allow target components to be specified with -n
-        const shell_cmd = {
+        let shell_cmd = {
             command: `am start ${launch_cmd_args.join(' ')}`,
         };
-        let retries = 10
+        let retries = 10;
+        let used_fallback = false;
         for (;;) {
             D(shell_cmd.command);
             const stdout = await new ADBClient(deviceid).shell_cmd(shell_cmd);
@@ -198,10 +218,21 @@ class Debugger extends EventEmitter {
                 // return the stdout from am (it shows the fully qualified component name)
                 return stdout.toString().trim();
             }
+            // If the configured launch activity cannot be started (e.g. it exists in
+            // the manifest but is not exported), retry once with the manifest launcher.
+            if (!used_fallback && fallback_cmd_args && /Permission Denial|not exported|Activity not found|does not exist|Unable to find explicit activity/i.test(stdout)) {
+                D('am start failed with the configured activity - retrying with the launcher activity');
+                shell_cmd = { command: `am start ${fallback_cmd_args.join(' ')}` };
+                used_fallback = true;
+                retries = 10;
+                continue;
+            }
             else if (retries <= 0){
                 throw new Error(stdout.toString().trim());
             }
             retries -= 1;
+            // wait a moment before retrying (am start can transiently fail when the system is busy)
+            await sleep(1000);
         }
     }
 

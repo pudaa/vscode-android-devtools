@@ -567,7 +567,25 @@ class AndroidDebugSession extends DebugSession {
             this.checkBuildIsUpToDate(args.staleBuild);
 
             // check we have something to launch - we do this again later, but it's a bit better to do it before we start device comms
+            const pkg_name = this.apk_file_info.manifest.package;
+            const manifest_activities = this.apk_file_info.manifest.activities || [];
+            // ".ui.MainActivity" -> "com.example.app.ui.MainActivity"
+            const normalizeActivity = (name) => {
+                const s = String(name || '').trim();
+                return s.startsWith('.') ? pkg_name + s : s;
+            };
             let launchActivity = args.launchActivity;
+            if (launchActivity) {
+                // Validate the configured activity actually exists in the APK. A stale
+                // or wrong launchActivity would otherwise make `am start` fail with
+                // "Permission Denial" / "Activity not found", which left the app stuck.
+                const full = normalizeActivity(launchActivity);
+                const valid = manifest_activities.some(a => normalizeActivity(a) === full);
+                if (!valid) {
+                    this.LOG(`Configured launchActivity '${launchActivity}' not found in APK manifest - using launcher '${this.apk_file_info.manifest.launcher || ''}' instead.`);
+                    launchActivity = '';
+                }
+            }
             if (!launchActivity)
                 if (!(launchActivity = this.apk_file_info.manifest.launcher))
                     throw new Error('No valid launch activity found in AndroidManifest.xml or launch.json');
@@ -602,6 +620,8 @@ class AndroidDebugSession extends DebugSession {
                     launchActivity,
                     this.am_start_args,
                     args.postLaunchPause);
+                // fall back to the manifest launcher if the configured activity can't start
+                build.fallbackLaunchActivity = this.apk_file_info.manifest.launcher;
                 this.LOG(`Launching on device ${this._device.serial} [API:${this.device_api_level||'?'}] (logcat-only)`);
                 if (this.am_start_args) {
                     this.LOG(`Using custom launch arguments '${this.am_start_args.join(' ')}'`);
@@ -708,6 +728,8 @@ class AndroidDebugSession extends DebugSession {
             launchActivity,
             this.am_start_args,
             postLaunchPause);
+        // fall back to the manifest launcher if the configured activity can't start
+        build.fallbackLaunchActivity = this.apk_file_info.manifest.launcher;
 
         this.LOG(`Launching on device ${this._device.serial} [API:${this.device_api_level||'?'}]`);
         if (this.am_start_args) {
