@@ -198,6 +198,8 @@ function activate(context) {
             }),
             // install + launch the app + open logcat - independent of the debug session
             vscode.commands.registerCommand('android-dev-ext.launchApp', () => launchAppAndOpenLogcat()),
+            // build & launch the RELEASE variant (no debugging - usable day-to-day)
+            vscode.commands.registerCommand('android-dev-ext.launchRelease', () => launchAppAndOpenLogcat('release')),
             vscode.commands.registerCommand('PickAndroidDevice', async (launchConfig) => {
                 // if the config has both PickAndroidDevice and PickAndroidProcess, ignore this
                 // request as PickAndroidProcess already includes chooosing a device...

@@ -53,6 +53,10 @@ class LaunchViewProvider {
                     // install + launch + open logcat - independent of the debug session
                     await vscode.commands.executeCommand('android-dev-ext.launchApp');
                     break;
+                case 'launch-release':
+                    // build the RELEASE variant and launch it (no debugging)
+                    await vscode.commands.executeCommand('android-dev-ext.launchRelease');
+                    break;
                 case 'launch-debug':
                     await vscode.commands.executeCommand('workbench.action.debug.start');
                     break;
@@ -157,6 +161,7 @@ body { font-family: var(--vscode-font-family); font-size: var(--vscode-font-size
 
 <button class="btn" id="btnLogcat" data-cmd="launch-logcat">${i18n.localize('control.btnLaunchLogcat', '▶ Launch + Logcat')}</button>
 <button class="btn" id="btnDebug" data-cmd="launch-debug">${i18n.localize('control.btnLaunchDebug', 'Debug Launch')}</button>
+<button class="btn secondary" id="btnRelease" data-cmd="launch-release">${i18n.localize('control.btnLaunchRelease', 'Build & Launch Release')}</button>
 <button class="btn secondary" id="btnOpenLogcat" data-cmd="open-logcat">${i18n.localize('control.btnViewLogcat', 'View Logcat')}</button>
 <button class="btn secondary" id="btnLaunchJson" data-cmd="open-launchjson">${i18n.localize('control.btnEditLaunchJson', 'Edit launch.json')}</button>
 

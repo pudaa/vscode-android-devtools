@@ -8,6 +8,9 @@
  * approach did - no -D, no attach, no TerminatedEvent/auto-restart loop).
  */
 const vscode = require('vscode');
+const path = require('path');
+const fs = require('fs');
+const { execFile } = require('child_process');
 const { ADBClient } = require('./adbclient');
 const { APKFileInfo } = require('./apk-file-info');
 const { checkADBStarted } = require('./utils/android');
@@ -104,19 +107,88 @@ async function runPreLaunchTask(taskName) {
 }
 
 /**
- * Start the app on a device and open the sidebar Logcat view. Fully independent
- * of the VS Code debug session.
+ * Run a gradle task (e.g. assembleDebug / assembleRelease) via the project's
+ * gradle wrapper, with a progress notification.
+ * @param {string} task
  */
-async function launchAppAndOpenLogcat() {
+async function runGradleTask(task) {
+    const folders = vscode.workspace.workspaceFolders;
+    const root = folders && folders[0] ? folders[0].uri.fsPath : '';
+    if (!root) return;
+    const gradlew = path.join(root, /^win/.test(process.platform) ? 'gradlew.bat' : 'gradlew');
+    if (!fs.existsSync(gradlew)) return;
+    await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: i18n.localize('launch.building', 'Building APK ({0})...', task) },
+        () => new Promise((resolve, reject) => {
+            execFile(gradlew, [task], { cwd: root, shell: true, maxBuffer: 16 * 1024 * 1024 }, (err, _stdout, stderr) => {
+                if (err) {
+                    reject(new Error(i18n.localize('launch.buildFailed', 'Gradle build failed: {0}', (stderr || err.message || '').slice(0, 400))));
+                } else {
+                    resolve();
+                }
+            });
+        })
+    );
+}
+
+/**
+ * Build the APK for the requested variant.
+ * Priority: explicit gradleTask -> configured preLaunchTask -> gradlew assemble<Variant>.
+ * @param {string} variant 'debug' | 'release'
+ * @param {*} cfg
+ */
+async function buildApk(variant, cfg) {
+    const task = cfg.gradleTask && String(cfg.gradleTask).trim();
+    if (task) {
+        await runGradleTask(task);
+        return;
+    }
+    if (cfg.preLaunchTask) {
+        await runPreLaunchTask(cfg.preLaunchTask);
+        return;
+    }
+    await runGradleTask(variant === 'release' ? 'assembleRelease' : 'assembleDebug');
+}
+
+/**
+ * Map the configured APK path to the requested variant.
+ * debug: .../apk/debug/app-debug.apk -> release: .../apk/release/app-release.apk
+ * @param {string} apkFile
+ * @param {string} variant
+ * @returns {string}
+ */
+function resolveVariantApk(apkFile, variant) {
+    const rel = String(apkFile || '');
+    if (variant !== 'release' || !rel) return rel;
+    const m = rel.match(/^(.*\/apk\/)debug\/(.+)-debug\.apk$/i);
+    if (m) return `${m[1]}release/${m[2]}-release.apk`;
+    return rel.replace(/\/debug\//g, '/release/').replace(/-debug\.apk$/i, '-release.apk');
+}
+
+/**
+ * Start the app on a device and open the sidebar Logcat view. Fully independent
+ * of the VS Code debug session. The build variant comes from the explicit
+ * argument (if given) or launch.json 'buildVariant' (default 'debug').
+ * @param {string} [variant] 'debug' | 'release'
+ */
+async function launchAppAndOpenLogcat(variant) {
     try {
         const cfg = getAndroidLaunchConfig() || {};
-        const apkFile = resolveWorkspacePath(cfg.apkFile);
+        const buildVariant = (variant || cfg.buildVariant || 'debug').toLowerCase() === 'release' ? 'release' : 'debug';
+
+        // 1. build the requested variant
+        await buildApk(buildVariant, cfg);
+
+        // 2. resolve the APK for this variant
+        const apkFile = resolveVariantApk(resolveWorkspacePath(cfg.apkFile), buildVariant);
         if (!apkFile) {
             vscode.window.showErrorMessage(i18n.localize('launch.noApk', 'No apkFile configured in launch.json'));
             return;
         }
-        // build first (e.g. "run gradle") so the APK is up to date
-        await runPreLaunchTask(cfg.preLaunchTask);
+        if (!fs.existsSync(apkFile)) {
+            vscode.window.showErrorMessage(i18n.localize('launch.apkMissing', 'APK not found: {0}', apkFile));
+            return;
+        }
         const info = await APKFileInfo.from({ apkFile });
 
         if (!(await checkADBStarted(cfg.autoStartADB !== false))) {
@@ -151,4 +223,5 @@ module.exports = {
     launchAppAndOpenLogcat,
     pickLaunchActivity,
     runPreLaunchTask,
+    resolveVariantApk,
 };

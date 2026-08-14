@@ -25,6 +25,7 @@
         "onStartupFinished",
         "onCommand:android-dev-ext.view_logcat",
         "onCommand:android-dev-ext.launchApp",
+        "onCommand:android-dev-ext.launchRelease",
         "onCommand:PickAndroidDevice",
         "onCommand:PickAndroidProcess",
         "onView:android-devtools.launch",
@@ -262,6 +263,10 @@
             {
                 "command": "android-dev-ext.launchApp",
                 "title": "%command.launch_app%"
+            },
+            {
+                "command": "android-dev-ext.launchRelease",
+                "title": "%command.launch_release%"
             },
             {
                 "command": "PickAndroidDevice",
