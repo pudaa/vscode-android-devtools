@@ -387,6 +387,29 @@ class LogcatContent {
             this.listProcesses(client);
         } else if (message === 'cmd:export_logcat') {
             this.exportLogcat();
+        } else if (message === 'cmd:dump_crash') {
+            this.dumpCrashLog();
+        }
+    }
+
+    /**
+     * Dump the crash buffer (logcat -b crash) into the view, prefixed with a
+     * separator so the user can inspect app crashes from the toolbar.
+     */
+    async dumpCrashLog() {
+        try {
+            const out = await new ADBClient(this._logcatid).shell_cmd(
+                { command: 'logcat -d -b crash -v threadtime' }, 10000);
+            const text = String(out || '').trim();
+            if (!text) {
+                this.sendClientMessage(':procsep:' + loc('logcat.noCrash', '── No crash logs ──'));
+                return;
+            }
+            this.sendClientMessage(':procsep:' + loc('logcat.crashDump', '── Crash buffer (logcat -b crash) ──'));
+            // feed the crash lines through the normal rendering pipeline
+            this.onLogcatContent({ logs: text.split(/\r?\n/) });
+        } catch (e) {
+            D('dump crash log failed: ' + e.message);
         }
     }
 
@@ -440,15 +463,22 @@ class LogcatContent {
         // log direction preference: false = terminal style (new lines at the
         // bottom, the default), true = Android Studio style (newest at the top)
         let newestFirst = false;
+        // max rendered rows (configurable, default 3000)
+        let maxRows = 3000;
         try {
             const vscode = require('vscode');
             const cfg = vscode.workspace.getConfiguration('android-dev-ext');
             newestFirst = cfg.get('logcatNewestFirst', false) === true;
+            const mr = cfg.get('logcatMaxRows', 3000);
+            if (typeof mr === 'number' && mr >= 100 && mr <= 100000) {
+                maxRows = mr;
+            }
         } catch (e) { /* not inside the extension host */ }
         vars = Object.assign({
             logcatid: this._logcatid,
             wssport: Server.options.port,
             lNewestFirst: newestFirst,
+            lMaxRows: maxRows,
             lFilterPlaceholder: loc('logcat.filterPlaceholder', 'Filter regex (e.g. word|error)'),
             lFilterTitle: loc('logcat.filterTitle', 'Filter regex'),
             lPause: loc('logcat.pause', 'Pause / resume'),
@@ -471,6 +501,7 @@ class LogcatContent {
             lColMessage: loc('logcat.colMessage', 'Message'),
             lWaitingLogs: loc('logcat.waitingLogs', 'Waiting for logs...'),
             lExport: loc('logcat.export', 'Export logcat'),
+            lCrash: loc('logcat.crashTitle', 'Show crash buffer (logcat -b crash)'),
             lProcessTitle: loc('logcat.processTitle', 'Filter logs'),
             lColumns: loc('logcat.columns', 'Columns'),
         }, vars);
@@ -608,7 +639,10 @@ function onWebSocketClientConnection(client, req) {
     client.on('message', function(message) {
         const lc = LogcatInstances.get(this._logcatid);
         if (lc) {
-            lc.onClientMessage(this, message);
+            // ws delivers Buffers by default; onClientMessage compares against
+            // strings, so decode first (this used to silently break EVERY
+            // client command: clear, filter switch, process select, export...)
+            lc.onClientMessage(this, String(message));
         }
     }.bind(client));
 

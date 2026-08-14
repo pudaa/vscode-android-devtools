@@ -71,10 +71,13 @@ class SettingsViewProvider {
     render() {
         const cfg = getAndroidLaunchConfig() || {};
         const openLogcat = cfg.openLogcatAfterLaunch === true;
+        const waitDbg = cfg.waitForDebugger === true;
         const apk = cfg.apkFile || '';
         const activity = cfg.launchActivity || '';
         const adb = cfg.adbSocket || 'localhost:5037';
         const pmArgs = Array.isArray(cfg.pmInstallArgs) ? cfg.pmInstallArgs.join(' ') : '-r';
+        const releaseTask = cfg.releaseGradleTask || '';
+        const logcatFilter = cfg.logcatFilter || '';
 
         return `<!DOCTYPE html><html><head><meta charset="utf8">
 <style>
@@ -96,6 +99,10 @@ body { font-family: var(--vscode-font-family); font-size: var(--vscode-font-size
   <input type="checkbox" id="openLogcat" ${openLogcat ? 'checked' : ''} data-key="openLogcatAfterLaunch"/>
   <label for="openLogcat">${i18n.localize('settings.openLogcatAfterLaunch', 'Open Logcat after launch (no debugger)')}</label>
 </div>
+<div class="check">
+  <input type="checkbox" id="waitDbg" ${waitDbg ? 'checked' : ''} data-key="waitForDebugger"/>
+  <label for="waitDbg">${i18n.localize('settings.waitForDebugger', 'Launch with -D (wait for debugger, breakpoints from Application.onCreate)')}</label>
+</div>
 <div class="field">
   <label>${i18n.localize('settings.apkFile', 'APK file')}</label>
   <input type="text" data-key="apkFile" value="${escapeAttr(apk)}"/>
@@ -114,6 +121,16 @@ body { font-family: var(--vscode-font-family); font-size: var(--vscode-font-size
   <label>${i18n.localize('settings.pmInstallArgs', 'pm install args')}</label>
   <input type="text" data-key="pmInstallArgs" value="${escapeAttr(pmArgs)}"/>
   <div class="hint">${i18n.localize('settings.pmInstallArgsHint', 'space-separated, e.g. -r -d')}</div>
+</div>
+<div class="field">
+  <label>${i18n.localize('settings.releaseGradleTask', 'Release gradle task')}</label>
+  <input type="text" data-key="releaseGradleTask" value="${escapeAttr(releaseTask)}"/>
+  <div class="hint">${i18n.localize('settings.releaseGradleTaskHint', 'Used by Build & Launch Release. Default: assembleRelease')}</div>
+</div>
+<div class="field">
+  <label>${i18n.localize('settings.logcatFilter', 'Logcat filter')}</label>
+  <input type="text" data-key="logcatFilter" value="${escapeAttr(logcatFilter)}"/>
+  <div class="hint">${i18n.localize('settings.logcatFilterHint', 'Extra adb logcat args, e.g. --pid=1234 or -s MyTag:*')}</div>
 </div>
 <button class="btn" id="save">${i18n.localize('settings.save', 'Save to launch.json')}</button>
 <script>

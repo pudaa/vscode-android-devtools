@@ -79,7 +79,9 @@
         .log.filter {display:none;}
         .log:hover {background:rgba(128,128,128,.12);}
         .log .t {flex:0 0 10.5em;color:#888;padding-right:.8em;}
-        .log .lvl {flex:0 0 1.4em;border:none;padding:0;text-align:center;font-weight:bold;}
+        /* inherit the level color from the row (the toolbar .lvl buttons share
+           this class and force a grey color; specificity + inherit fixes it) */
+        .log .lvl {flex:0 0 1.4em;border:none;padding:0;text-align:center;font-weight:bold;color:inherit;}
         .log .pid {flex:0 0 4.5em;color:#6a9;padding-right:.8em;}
         .log .tid {flex:0 0 4.5em;color:#698;padding-right:.8em;}
         .log .tag {flex:0 0 auto;color:#c9a;padding-right:.8em;max-width:12em;overflow:hidden;text-overflow:ellipsis;}
@@ -125,6 +127,7 @@
                 <button id="scrollbtn" class="act on" title="!{lAutoScroll}">⇣</button>
                 <button id="clearlcbtn" class="act" disabled="true" title="!{lClear}">🗑</button>
                 <button id="exportbtn" class="act" disabled="true" title="!{lExport}">⤓</button>
+                <button id="crashbtn" class="act" disabled="true" title="!{lCrash}">💥</button>
                 <button id="colbtn" class="act" title="!{lColumns}">▤</button>
                 <div id="colmenu" class="colmenu">
                     <label><input type="checkbox" data-col="t" checked/> !{lColTime}</label>
@@ -224,7 +227,12 @@
 
                     // Cap the number of rendered log rows so the page doesn't get slower
                     // as logs accumulate (DOM nodes were previously never removed).
-                    var MAX_LOG_ROWS = 3000;
+                    // Configurable via android-dev-ext.logcatMaxRows (default 3000).
+                    var MAX_LOG_ROWS = !{lMaxRows} || 3000;
+                    // Cap the pending queue too: while paused, lines would
+                    // otherwise accumulate without bound and freeze the view
+                    // when unpausing.
+                    var MAX_PENDING = 5000;
 
                     // ── re-order the bootstrap history to match the direction ──
                     // The backend buffers history newest-first; terminal style wants
@@ -263,6 +271,7 @@
                         const div = document.createElement('div');
                         div.className = 'log ' + parsed.lvl;
                         div.dataset.lvl = parsed.lvl;
+                        div.dataset.tag = parsed.tag;
                         const t = document.createElement('span');
                         t.className = 't'; t.textContent = parsed.time;
                         const l = document.createElement('span');
@@ -273,6 +282,14 @@
                         ti.className = 'tid'; ti.textContent = parsed.tid;
                         const tg = document.createElement('span');
                         tg.className = 'tag'; tg.textContent = parsed.tag;
+                        // Android Studio style: double-click a tag to filter by it
+                        tg.title = parsed.tag + ' (double-click to filter)';
+                        tg.addEventListener('dblclick', (ev) => {
+                            ev.stopPropagation();
+                            const inp = getId('q');
+                            inp.value = 'tag:' + parsed.tag;
+                            updateFilter(inp.value);
+                        });
                         const m = document.createElement('span');
                         m.className = 'msg'; m.textContent = parsed.msg;
                         // hover shows the full message; click the message to expand/collapse
@@ -303,12 +320,20 @@
                         updateLogCountDisplay();
                     };
 
-                    // combined level + regex filter
+                    // combined level + regex filter. The input also supports the
+                    // 'tag:<name>' syntax (set by double-clicking a tag) which
+                    // matches the TAG column only.
                     const applyAllFilters = (row) => {
                         if (!row) return true;
                         const levelVisible = applyLevelToRow(row);
                         let regexVisible = true;
-                        if (currfilter) regexVisible = currfilter.test(row._text);
+                        if (currfilter) {
+                            if (currfilter.tagOnly) {
+                                regexVisible = row.dataset.tag === currfilter.tagOnly;
+                            } else {
+                                regexVisible = currfilter.test(row._text);
+                            }
+                        }
                         const visible = levelVisible && regexVisible;
                         row.classList.toggle('filter', !visible);
                         return visible;
@@ -420,6 +445,9 @@
                     getId('exportbtn').onclick = (e) => {
                         ws && ws.send('cmd:export_logcat');
                     };
+                    getId('crashbtn').onclick = (e) => {
+                        ws && ws.send('cmd:dump_crash');
+                    };
                     getId('pausebtn').onclick = (e) => {
                         paused = !paused;
                         getId('pausebtn').classList.toggle('on', paused);
@@ -468,9 +496,13 @@
                         if (currfilter && currfilter.source === new_filter_source) return;
                         var newfilter = null;
                         if (new_filter_source) {
+                            // 'tag:<name>' filters the TAG column only
+                            const tagM = new_filter_source.match(/^tag:(\S+)\s*$/);
                             try {
-                                newfilter = new RegExp(new_filter_source, 'i');
-                                newfilter.matchCounts = {true:0,false:0};
+                                newfilter = tagM
+                                    ? { source: new_filter_source, tagOnly: tagM[1], test: () => true, matchCounts: {true:0,false:0} }
+                                    : new RegExp(new_filter_source, 'i');
+                                if (!tagM) newfilter.matchCounts = {true:0,false:0};
                             } catch(err) { return showFilterErr('!{lInvalidRegex}'); }
                         }
                         const logs = rows.getElementsByClassName('log');
@@ -520,6 +552,7 @@
                                 setStatus('');
                                 getId('clearlcbtn').disabled = false;
                                 getId('exportbtn').disabled = false;
+                                getId('crashbtn').disabled = false;
                                 ws = x;
                                 x.send('cmd:list_processes');
                             };
@@ -527,6 +560,7 @@
                                 ws = null;
                                 getId('clearlcbtn').disabled = true;
                                 getId('exportbtn').disabled = true;
+                                getId('crashbtn').disabled = true;
                             };
                             x.onerror = e => { setStatus('!{lConnectionError}'); };
                             x.onmessage = e => {
@@ -586,6 +620,12 @@
                                 // pendingLines stays chronological (oldest first);
                                 // flushPending renders it according to the direction
                                 pendingLines = lines.concat(pendingLines);
+                                // bound the queue: when paused the DOM is not
+                                // flushed, so drop the OLDEST overflow instead of
+                                // letting memory grow without limit
+                                if (pendingLines.length > MAX_PENDING) {
+                                    pendingLines = pendingLines.slice(pendingLines.length - MAX_PENDING);
+                                }
                                 scheduleFlush();
                             };
                         } catch(e) { setStatus('Connection exception'); }

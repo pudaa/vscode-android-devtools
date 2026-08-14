@@ -258,6 +258,12 @@
                     "type": "boolean",
                     "default": false,
                     "description": "When true, new logcat lines are inserted at the top of the list (newest first, like Android Studio). When false (default), new lines are appended at the bottom like a terminal - the view follows the tail of the log."
+                },
+                "android-dev-ext.logcatMaxRows": {
+                    "scope": "resource",
+                    "type": "number",
+                    "default": 3000,
+                    "description": "Maximum number of log rows kept in the Logcat view. Older rows are trimmed once the limit is reached."
                 }
             }
         },
