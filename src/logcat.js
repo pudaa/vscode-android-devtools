@@ -569,6 +569,23 @@ class LogcatContent {
         this._state = 'disconnected';
         this.sendDisconnectMsg();
     }
+
+    /**
+     * Stop the logcat monitor and release this instance. Used when switching
+     * to a different device or when the view is disposed. Safe to call
+     * multiple times (the monitor socket may already be closed).
+     */
+    dispose() {
+        if (this._pidRetryTimer) {
+            clearTimeout(this._pidRetryTimer);
+            this._pidRetryTimer = null;
+        }
+        this._state = 'disconnected';
+        LogcatInstances.delete(this._logcatid);
+        try {
+            this._adbclient.endLogcatMonitor();
+        } catch (e) { /* socket already closed */ }
+    }
 }
 
 function initWebSocketServer() {

@@ -219,6 +219,25 @@ class ADBClient {
     }
 
     /**
+     * Retrieve display properties (brand/model) from the connected device.
+     * Used to show recognisable device names instead of raw serials.
+     * @returns {Promise<{manufacturer:string, brand:string, model:string, marketname:string}>}
+     */
+    async get_device_props() {
+        const stdout = await this.shell_cmd({
+            command: 'getprop ro.product.manufacturer; getprop ro.product.brand; getprop ro.product.model; getprop ro.product.marketname',
+            untilclosed: true,
+        }, 5000);
+        const lines = String(stdout || '').split(/\r?\n/).map(s => s.trim());
+        return {
+            manufacturer: lines[0] || '',
+            brand: lines[1] || '',
+            model: lines[2] || '',
+            marketname: lines[3] || '',
+        };
+    }
+
+    /**
      * Setup ADB port-forwarding from a local port to a JDWP process
      * @param {{localport:number, jdwp:number}} o 
      */

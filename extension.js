@@ -13,7 +13,7 @@ const { SettingsViewProvider } = require('./src/settingsView');
 const { launchAppAndOpenLogcat } = require('./src/launchApp');
 const i18n = require('./src/i18n');
 const { selectAndroidProcessID } = require('./src/process-attach');
-const { selectTargetDevice } = require('./src/utils/device');
+const { selectTargetDevice, getDeviceManager } = require('./src/utils/device');
 
 /**
  * @param {vscode.ExtensionContext} context
@@ -133,6 +133,14 @@ function activate(context) {
     // load i18n string table (en default, zh-cn supported)
     i18n.load(context);
 
+    // start the device manager: polls the ADB device list, enriches it with
+    // brand/model names and remembers the user's device choice until the
+    // device disconnects (used by Launch / Logcat / device dropdowns).
+    const deviceManager = getDeviceManager(context);
+    deviceManager.start();
+    context.subscriptions.push({ dispose: () => deviceManager.stop() });
+    console.log('[android-dev-ext] activate(): device manager started');
+
     /* Only the logcat stuff is configured here. The debugger is launched from src/debugMain.js  */
     AndroidContentProvider.register(context, vscode.workspace);
     console.log('[android-dev-ext] activate(): content provider registered');
@@ -206,9 +214,12 @@ function activate(context) {
                 if (launchConfig && launchConfig.processId === '${command:PickAndroidProcess}') {
                     return '';
                 }
-                const device = await selectTargetDevice(vscode, "Launch", { alwaysShow:true });
+                // the persisted device choice (from the Settings device dropdown)
+                // is used automatically - the picker only shows when multiple
+                // devices are connected and no choice has been made yet.
+                const device = await selectTargetDevice(vscode, 'Launch');
                 // the debugger requires a string value to be returned
-                return JSON.stringify(device);
+                return device ? JSON.stringify(device) : 'null';
             }),
             // add the process picker handler - used to choose a PID to attach to
             vscode.commands.registerCommand('PickAndroidProcess', async (launchConfig) => {
