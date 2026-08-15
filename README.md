@@ -18,7 +18,8 @@
 - **崩溃缓冲**：一键查看 `logcat -b crash` / *One-click crash buffer view (`logcat -b crash`)*
 - **导出日志**：将当前 logcat 导出为文件 / *Export logcat to a file*
 - **侧边栏启动视图**：一键「启动并查看日志」「调试启动」「编译并启动 Release」/ *Launch view: one-click "Launch + Logcat", "Debug Launch", "Build & Launch Release"*
-- **侧边栏设置视图**：可视化编辑 `launch.json` / *Settings view: visual editor for launch.json*
+- **侧边栏设置视图**：可视化编辑 `launch.json`，含**目标设备下拉框** / *Settings view: visual editor for launch.json, with a target-device dropdown*
+- **智能设备管理**：设备列表实时刷新（接入/断开自动感知），设备显示品牌+型号（如 `HONOR HLK-AL00`，模拟器标注 `(Emulator)`），所选设备在断开前一直记住——多设备调试不再每次弹窗选择 / *Smart device management: live device list, recognisable brand+model names, and a persisted device choice (until the device disconnects) - no more picker popup on every debug start*
 - **`openLogcatAfterLaunch`**：只跑 App 看日志，不附加调试器 / *Run the app & auto-open Logcat without attaching the debugger*
 - **Java 智能提示**（beta）/ *Java Intellisense (beta)*
 - **中英文界面**（i18n）/ *English + Simplified Chinese UI*
@@ -39,9 +40,14 @@
 - 导出 Logcat 到文件
 - 大规模日志渲染性能优化（DOM 上限 + 批量渲染 + 屏外跳过）
 - 「编译并启动 Release」命令（自动映射 debug→release APK 路径，签名冲突自动重装）
+- 智能设备管理 —— 设备列表实时轮询（2s），显示品牌+型号（如 `HONOR HLK-AL00`，模拟器标注 `(Emulator)`）
+- 目标设备下拉框（设置视图）—— 接入/断开设备实时刷新、显示当前连接状态、选择持久化（设备断开前一直记住）
+- 持久化设备选择 —— `PickAndroidDevice` / 调试 / 启动均复用所选设备，多设备时不再每次调试都弹窗选择
 
 **修复：**
 
+- Logcat 无设备时占位页的「重试」按钮无效（消息处理器现在在视图解析时即挂载，且设备接入后自动连接）
+- 切换设备时旧 Logcat 监视器未停止（新增 `LogcatContent.dispose()` 清理）
 - 调试器 attach 改为轮询等待目标进程（30s），覆盖安装 / 冷启动后可靠重连
 - Logcat 渲染卡顿 —— 限制 DOM 节点上限（2000 行）+ 收窄后端历史缓存
 - 华为 / EMUI 真机调试兼容（普通启动 + attach 替代 `-D` 等待调试器）

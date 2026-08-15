@@ -1,5 +1,13 @@
 # Change Log
 
+### version 1.6.0
+* NEW: Device manager - the connected-device list is polled continuously (2s) and enriched with recognisable names (brand + model via `getprop`, e.g. "HONOR HLK-AL00", "(Emulator)" for emulators) instead of raw serials.
+* NEW: Settings view now has a target-device dropdown: the device list refreshes in real time when devices connect/disconnect, the current selection is displayed below the dropdown, and the choice is persisted until the device disconnects.
+* NEW: Persistent device selection - `PickAndroidDevice`, "Launch + Logcat" and the debug flows reuse the chosen device, so the device picker no longer pops up on every debug start.
+* NEW: Logcat view auto-connects when a device is plugged in and shows a placeholder when the device disconnects.
+* FIX: The Logcat "Retry / Refresh" button on the no-device placeholder did nothing (the message handler was only attached after a successful device connection).
+* FIX: Switching devices no longer leaks the previous logcat monitor (`LogcatContent.dispose()` stops it).
+
 ### version 1.5.1
 * FIX: Sidebar views (Launch / Logcat / Settings) now declare `"type": "webview"` so they render correctly - the 1.5.0 package uploaded to the Marketplace predated this fix and showed "no registered data provider" for all three views.
 
